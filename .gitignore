@@ -2,3 +2,6 @@ node_modules/
 main.js
 data.json
 *.log
+
+# Phase 0 本地凭据（不入库）
+.env.local
