@@ -10,4 +10,14 @@
 | `.dev/tests/phase0/github/` | Git Data API 探索脚本；`.env.local`（gitignore）存测试仓库名与 token |
 | `.dev/changelog/` | 开发日志 |
 | `.agents/conversationlog/` | 对话日志（Session ID 与决策要点） |
-| `src/`、`tests/` | 插件源码与活跃测试（Phase 1 起） |
+| `src/main.ts` | 插件入口：语言、设置加载、设置页注册、`getToken()` |
+| `src/core/` | 纯逻辑，禁止 import `obsidian`：`generator/`（Quartz 适配）、`backend/`（GitHub 客户端）、`manifest/`、`connection.ts`（测试连接）、`hash.ts`、`types.ts` |
+| `src/platform/` | 与 Obsidian 绑定的实现（`http.ts`：requestUrl 版 HttpFn） |
+| `src/settings/` | 设置数据（`settings.ts`）、校验（`validate.ts`）、声明式设置页（`tab.ts`）、站点子页面（`site-page.ts`）、测试连接结果文字（`connection-view.ts`） |
+| `src/ui/` | 通用界面：确认弹窗、站点选择弹窗 |
+| `src/i18n/` | `en.ts` 定义全部键，`zh.ts` 必须同键 |
+| `.dev/unit-tests/backend/fake-github.ts` | 内存版 GitHub Git Data API，测试提交流程与非 fast-forward |
+| `.dev/unit-tests/` | 正式单元测试（vitest，必须通过）；`test-vault/` 为开发用测试 vault（`.obsidian/` 不入库） |
+| `.dev/tests/` | 探索性测试（允许失败） |
+| `.dev/tests/phase1/quartz/format-link-e2e.mjs` | 打包真实 `formatLink`，在本地 Quartz 测试站验证三种链接策略的实际构建产物（在 Pressroom 根目录运行，参数为 Quartz 测试站目录） |
+| `.dev/unit-tests/generator/fixtures/` | Quartz 5 自带的默认 `quartz.config.default.yaml`，供 `readSiteConfig` 测试 |

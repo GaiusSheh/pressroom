@@ -178,7 +178,7 @@
 - GitHub 写入使用 Git Data API（blob → tree → commit → 更新分支 ref），一次操作一次提交；不创建分支、不开 PR。
 - 网址规则与 Quartz 5 `slugifyFilePath` 保持一致，并有单元测试覆盖中文、空格、大小写、特殊字符。**v1：直接依赖 Quartz 5 所用的 npm 包 `@quartz-community/utils`（`/path` 子模块，MIT，纯函数），不自行重写**；单元测试用 Phase 0 用例表。
 - GitHub 更新 ref 遇 422（非 fast-forward，如多设备同时发布）时：重新取 ref、重读 manifest、重建提交，有上限地重试。
-- token 用 `secretStorage` + `SecretComponent`（data.json 只存密钥 id），`minAppVersion` 为 1.11.4。
+- token 用 `secretStorage` + `SecretComponent`（data.json 只存密钥 id），`minAppVersion` 为 ~~1.11.4~~ **1.13.0**（2026-10-03 用户决定：设置页采用 1.13 起的声明式设置 API，旧的 `display()` 写法已弃用，且声明式设置项可进入 Obsidian 设置搜索）。
 - 发布完成后提示「约 1 分钟后生效」（站点构建时间）。
 
 ## 11. 待定问题

@@ -57,3 +57,61 @@ Phase 0 详细计划的所有验收标准均已达成：
 - [✓] 需求与总体计划已按技术调整流程更新
 
 **状态**: 开发完成，验收通过
+
+## 2026-10-03 Phase 1 工程骨架与核心纯逻辑
+
+### 2026-10-03 22:50 Phase 1 工程骨架与核心纯逻辑
+
+**变更类型**: 核心功能实现
+**影响范围**: 插件工程、`src/`（i18n、设置页、core 模块）、`.dev/unit-tests/`
+
+#### 实现功能详细
+
+**1-1 工程初始化** [✓]
+- 以官方 obsidian-sample-plugin 为蓝本：esbuild、TypeScript strict、`eslint-plugin-obsidianmd`、vitest、MIT 许可证
+- `manifest.json`：id `pressroom`、仅桌面端、`minAppVersion` 1.13.0
+- 构建后按根目录 `.env.local` 的 `PRESSROOM_VAULT` 把产物复制到测试 vault（`.dev/unit-tests/test-vault/`）
+- 依赖：`@quartz-community/utils`、`github-slugger`（前者的可选 peer 依赖，需显式声明）
+
+**1-2 中英双语** [✓]
+- 字典键由英文字典推导，中文缺键编译报错；插值缺参抛错；语言跟随 Obsidian `getLanguage()`
+
+**1-3 设置页** [✓]
+- Obsidian 1.13 声明式设置 API：全局设置（token、排除文件夹、链接默认处理、属性白名单）+ 站点列表
+- token 用 `SecretComponent` 存 Obsidian 密钥库，`data.json` 只存密钥 id
+- 站点子页面：字段校验、测试连接、移除站点
+
+**1-4 Quartz 适配层**（`src/core/generator/`）[✓]
+- slug / 网址 / alias slug 复用 Quartz 5 的 `@quartz-community/utils`
+- 冲突检测（文件 + aliases，按 slug 比较，支持排除被移动笔记自身）
+- `formatLink`：以目标 slug 作链接目标，按站点链接策略输出完整路径或相对路径
+- `readSiteConfig`：读取链接策略、AliasRedirects、ignorePatterns、baseUrl
+
+**1-5 GitHub 客户端**（`src/core/backend/`）[✓]
+- Git Data API 单次提交（增 / 改 / 删 / 复用 blob 挪动），非 fast-forward 时重新取 head 重建，最多重试 3 次
+- 错误分类（token 无效、无权限、频率上限、不存在、冲突等），信息带状态码与 GitHub 原文
+- 「测试连接」流程（`src/core/connection.ts`）与结果文字（`src/settings/connection-view.ts`）
+- `requestUrl` 版 HTTP（`src/platform/http.ts`）；站点选择弹窗（`src/ui/site-picker.ts`，供 Phase 2 使用）
+
+**1-6 manifest**（`src/core/manifest/`）[✓]
+- `ManifestV1` 结构与逐字段校验（含路径合法性、重复、附件登记、未来版本拒绝）
+- 稳定序列化：内容相同则 blob SHA 相同；与内容同一次提交写入
+
+#### 技术调整记录
+- **最低版本**：~~1.11.4~~ → [✓] 1.13.0（用户决定，采用声明式设置 API，旧 `display()` 已弃用）
+- **站点子页面**：~~声明式 `items` + 每次改名 `update()`~~ **[!] 实测子页面变空白并打断拼音输入** → [✓] 自定义 `SettingPage` 子类，离开子页面时再刷新列表
+- **删除站点**：框架对 page 类型列表项不显示删除按钮（仅 Delete 键可删）→ [✓] 子页面内增加「移除站点」按钮
+- **链接格式**：~~`[文字](<站内路径.md#锚点>)`~~ → [✓] `[文字](<目标 slug#锚点>)`（原文件名中的 `%` 会使 Quartz `decodeURI` 抛错）
+- **esbuild**：sample 的 0.25.5 与 vitest 5 冲突 → [✓] `^0.28.2`
+- **测试位置**：~~根目录 `tests/`~~ → [✓] `.dev/unit-tests/`（遵循全局规则）
+
+#### 测试验证结果
+- [✓] **单元测试**：12 个文件、217 项全部通过（slug 30 条用例、冲突检测、链接格式、站点配置、blob SHA 对照 `git hash-object`、内存版假 GitHub 联测提交流程与非 fast-forward 重试、manifest 校验与稳定序列化、设置规整与校验、i18n）
+- [✓] **Quartz 实际构建**：`formatLink` 三种策略 × 3 个深度 × 7 个目标，63 条链接全部指向正确页面与锚点
+- [✓] **测试 vault 人工实测**：中英界面、站点增删改与校验、拼音改名、token 不落 `data.json`、测试连接四种情况、`requestUrl` 自检提交（文本 + 二进制）
+- [✓] `npm run build`、`npm run lint` 零错误零警告
+
+#### 验收标准达成
+Phase 1 详细计划的所有验收标准均已达成；开发用自检命令已按计划删除。
+
+**状态**: 开发完成，验收通过

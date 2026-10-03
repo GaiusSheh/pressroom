@@ -89,6 +89,12 @@
 - 输出格式按站点 `quartz.config.yaml` 中 CrawlLinks 的 `markdownLinkResolution` 决定：shortest / absolute → 完整路径；relative → 由源与目标站内路径计算相对路径。插件可经 GitHub API 读取站点仓库的配置自动判断，无需用户填写。
 - 建议输出 Markdown 链接 `[显示文字](<站内路径.md#锚点>)`：不依赖 ObsidianFlavoredMarkdown 插件把维基链接转换为链接；锚点保留原标题文字，由 Quartz 自行 slug。尖括号写法中带 `#` 锚点的情况在 Phase 1 补测。
 
+### Phase 1 补测（2026-10-03，`.dev/tests/phase1/quartz/format-link-e2e.mjs`）
+- 最终格式：`[显示文字](<目标 slug#锚点原文>)`，链接目标写**目标的 slug**而非原文件名（~~`站内路径.md`~~）。原因：Quartz 会对链接目标再 slug 一次且结果不变；原文件名中的 `%` 会使 Quartz 的 `decodeURI` 抛错，`#` 会被当作锚点，空格需要转义——用 slug 后这些字符已被去除或替换，只剩半角括号由尖括号包裹。
+- 实测三种策略 × 3 个不同深度的源笔记 × 7 个目标（中文 + 空格、同名不同目录、`100% A&B #1`、`f(x)`、文件夹笔记、`#标题` 锚点、`#^块` 锚点），共 63 条链接全部指向正确页面，锚点 id 全部存在。
+- 别名网址规则：`slugifyFilePath(别名 + ".md")`（已以 `.md` 结尾则不补），与 note-properties 插件 `getAliasSlugs` 一致。`permalink` 不经 slug 原样加入 aliases。
+- Quartz 配置中的 `configuration.ignorePatterns` 匹配的文件不会被构建（默认含 `private`、`templates`）；`readSiteConfig` 已读出，发布到被忽略路径的提示在 Phase 2 实现。
+
 ---
 
 ## 0-3 aliases 重定向（需求 §11 待定问题）
@@ -116,6 +122,7 @@
 | `MenuItem` 二级子菜单 | **公开 API 中不存在**（只有 `setSection`），见下方需讨论项 | — |
 
 - **`minAppVersion` 建议 1.11.4**（secretStorage 的最低版本）。
+  - **Phase 1 调整（2026-10-03）**：提高到 **1.13.0**。1.13 起 `PluginSettingTab.display()` 弃用，改为声明式 `getSettingDefinitions()`（`list` / `page` / `control` / `validate` / `render`）；`ButtonComponent.setWarning()` 弃用，改为 `setDestructive()`。两者都是 1.13.0 才有。
 - 运行时验证（CORS、真实二进制上传、子菜单）放到 Phase 1 工程骨架里，在测试 vault 中实测。
 
 ---

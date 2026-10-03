@@ -1,0 +1,39 @@
+/* Pressroom 插件样式 */
+
+.pressroom-field-error {
+	color: var(--text-error);
+	margin-top: var(--size-4-1);
+}
+
+.pressroom-field-error:empty {
+	display: none;
+}
+
+.pressroom-conn-result {
+	padding: 0 0 var(--size-4-3);
+	font-size: var(--font-ui-small);
+}
+
+.pressroom-conn-line::before {
+	display: inline-block;
+	width: 1.5em;
+}
+
+.pressroom-conn-line.mod-ok::before {
+	content: '✓';
+	color: var(--text-success);
+}
+
+.pressroom-conn-line.mod-warn::before {
+	content: '!';
+	color: var(--text-warning);
+}
+
+.pressroom-conn-line.mod-error::before {
+	content: '✗';
+	color: var(--text-error);
+}
+
+.pressroom-suggestion-note {
+	color: var(--text-muted);
+}

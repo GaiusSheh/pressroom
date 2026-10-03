@@ -2,38 +2,30 @@
 
 ## 项目状态概览
 **目标**: 免费、开源的 Obsidian 发布插件——多站点、逐篇发布、零 frontmatter、带管理面板，替换 Enveloppe  
-**当前状态**: Phase 0 技术验证已验收通过；需求已按验证结论修订为 v1（`.dev/docs/requirements/v0/requirements.md`）  
+**当前状态**: Phase 1 工程骨架与核心纯逻辑已验收通过；需求 v1（`.dev/docs/requirements/v0/requirements.md`）  
 **项目性质**: Obsidian 社区插件（仅桌面端），作者自用 + 开源发布  
 **技术约束**: 仅 Quartz 5 + GitHub；不修改笔记与 frontmatter；站点之间不得产生可追溯关联；仓库内容必须脱敏（见 `.agents/AGENTS.md`）  
 **分支架构**: 标准单仓库，主分支开发  
-**下一阶段**: Phase 1 工程骨架与核心纯逻辑（待编写详细计划）
+**下一阶段**: Phase 2 单站发布闭环（待编写详细计划）
 
 ## 技术架构
 - **语言**: TypeScript，esbuild 打包，基于官方 obsidian-sample-plugin 工程结构
-- **生成器适配层**（`src/generator/`）: 网址 slug 规则、链接输出格式封装为接口，v1 只实现 Quartz 5，以后可接 Hugo
+- **生成器适配层**（~~`src/generator/`~~ `src/core/generator/`）: 网址 slug 规则、链接输出格式封装为接口，v1 只实现 Quartz 5，以后可接 Hugo
   - **Phase 0 调整**: slug 直接依赖 `@quartz-community/utils/path`（~~自行实现 slug~~）；链接格式按站点 `markdownLinkResolution` 适配
-- **存储后端**（`src/backend/`）: GitHub Git Data API（blob → tree → commit → 更新 ref），经 Obsidian `requestUrl` 调用，一次操作一次提交
-- **manifest**（`src/manifest/`）: 每站仓库内 `.pressroom/manifest.json`，仓库为唯一真相源
+- **存储后端**（~~`src/backend/`~~ `src/core/backend/`）: GitHub Git Data API（blob → tree → commit → 更新 ref），经 Obsidian `requestUrl` 调用（`src/platform/http.ts` 注入），一次操作一次提交
+- **manifest**（~~`src/manifest/`~~ `src/core/manifest/`）: 每站仓库内 `.pressroom/manifest.json`，仓库为唯一真相源
 - **内容转换**（`src/transform/`）: 纯函数管线——frontmatter 白名单 → 嵌入展开 → 双链改写 → 附件收集
 - **状态计算**（`src/state/`）: 转换结果的 git blob SHA 与仓库比对，得出 已同步 / 有修改 / 已移动 / 源已删除
 - **界面**: Obsidian API（右键菜单、命令、Modal、设置页），i18n 中英文字集中在 `src/i18n/`
-  - **Phase 0 调整**: 右键菜单 ~~二级子菜单~~ → 一级菜单项 + 站点选择弹窗（公开 API 无子菜单）；token 用 `secretStorage` + `SecretComponent`，`minAppVersion` 1.11.4
+  - **Phase 0 调整**: 右键菜单 ~~二级子菜单~~ → 一级菜单项 + 站点选择弹窗（公开 API 无子菜单）；token 用 `secretStorage` + `SecretComponent`，`minAppVersion` ~~1.11.4~~ 1.13.0（Phase 1 调整：设置页用声明式 API）
 - **测试**: vitest 覆盖纯逻辑模块（slug、转换、状态、manifest）；GitHub 交互用一次性测试仓库做手动/半自动验证
 - **架构特点**: 纯逻辑与 Obsidian/网络层分离，核心模块不依赖 `obsidian` 包，可直接单元测试
 
 ## 开发计划
 
-### [ ] Phase 1: 工程骨架与核心纯逻辑 (未来计划)
-**核心目标**: 搭工程，完成不依赖界面的核心模块并有单元测试
-- 工程初始化（manifest.json `isDesktopOnly: true`、esbuild、tsconfig、vitest、lint）
-- i18n 框架；设置页（站点增删、token 存 secretStorage、排除文件夹、属性白名单、双链默认值）
-- ~~Quartz slug 模块~~ 封装 `@quartz-community/utils` 的 slug 适配层 + 网址冲突检测（比较站点内容目录全部文件 + aliases；Phase 0 的 30 条用例表转为测试）
-- 补测：Markdown 链接尖括号写法带 `#` 锚点；`requestUrl` 运行时（二进制上传）在测试 vault 实测
-- GitHub 客户端（读 tree / 读文件 / 单次多文件提交；422 非 fast-forward 时有上限重试）
-- manifest 数据结构、读写与版本字段
-
-### [ ] Phase 2: 单站发布闭环 (未来计划)
+### [ ] Phase 2: 单站发布闭环 (下一步，待编写详细计划)
 **核心目标**: 一个手动模式站点上，右键完成 发布 / 更新 / 撤稿 / 获取链接 / 打开网页
+- 右键菜单用 Phase 1 已建的站点选择弹窗（`src/ui/site-picker.ts`）；发布到站点 `ignorePatterns` 匹配的路径时提示（Phase 1 已能读出）
 - 首次发布位置弹窗（手动模式、「按 Vault 目录」快捷填入、网址预览、冲突拦截）
 - 基础转换：frontmatter 白名单、指向已发布笔记的双链改写、未发布链接 → 纯文本
 - 附件上传到 `assets/`，按内容哈希去重，同名不同内容加后缀；撤稿不删附件
@@ -70,7 +62,7 @@
 ### 技术风险
 - **Quartz 5 slug 规则与插件不一致**: 网址冲突检测、获取链接全部失准 → ~~Phase 0 对照源码建测试表~~ **已缓解**：直接依赖 Quartz 所用的 `@quartz-community/utils`，用例表做回归；Quartz 升级时同步升级依赖
 - **Quartz 链接解析方式不支持插件输出的链接**: 双链改写失效 → **已缓解**：Phase 0 实测完整路径在 shortest/absolute 下可用，relative 输出相对路径
-- **secretStorage 不可用或需较新 Obsidian 版本**: token 无处安全存放 → **已确认** 1.11.4 起可用，`minAppVersion` 定为 1.11.4
+- **secretStorage 不可用或需较新 Obsidian 版本**: token 无处安全存放 → **已确认** 1.11.4 起可用，`minAppVersion` 定为 ~~1.11.4~~ 1.13.0（Phase 1 中为采用声明式设置 API 提高）
 - **Git Data API 并发冲突**（多设备同时发布、外部推送）: 更新 ref 失败 → 提交前取最新 ref，非 fast-forward 时重试并重读 manifest
 - **manifest 与仓库实际内容不一致**（手工改仓库）: 状态误判 → 状态以仓库实际 blob 为准，manifest 只做索引；提供重新扫描
 
@@ -114,3 +106,22 @@
 **技术调整/发现/突破**:
 - **右键菜单**: ~~二级子菜单~~ **[!] 公开 API 不支持** → [✓] 一级菜单项 + 站点选择弹窗
 - **冲突检测**: ~~只比 manifest~~ → [✓] 站点内容目录全部文件 + aliases（Quartz 冲突只警告、后者覆盖）
+
+### [✓] Phase 1: 工程骨架与核心纯逻辑 (已完成)
+**详细计划**: `.dev/plans/implemented/phase1-detailed-plan.md`  
+**完成时间**: 2026-10-03 22:55 (耗时约 5 小时)  
+**技术成果**: 插件工程与设置页可用，Quartz 适配 / GitHub 客户端 / manifest 三个核心模块完成并有 217 项单元测试
+
+- [✓] **工程初始化**: esbuild、TypeScript、`eslint-plugin-obsidianmd`、vitest；构建产物自动复制到测试 vault
+- [✓] **中英双语**: 字典类型约束，语言跟随 Obsidian
+- [✓] **设置页**: 声明式 API + 自定义站点子页面；token 存密钥库；测试连接
+- [✓] **Quartz 适配层**: slug / 网址 / 冲突检测 / 链接格式 / 站点配置读取；Quartz 实际构建验证 63 条链接
+- [✓] **GitHub 客户端**: 单次提交增改删与挪动、非 fast-forward 重试、错误分类；测试 vault 实测 `requestUrl` 上传文本与二进制
+- [✓] **manifest**: 结构校验、稳定序列化、与内容同一次提交
+- [✓] **验收确认**: 人类验收通过
+
+**技术调整/发现/突破**:
+- **最低版本**: ~~1.11.4~~ → [✓] 1.13.0（声明式设置 API）
+- **站点子页面**: ~~声明式 items + 改名时 `update()`~~ **[!] 子页面变空白、打断拼音输入** → [✓] 自定义 `SettingPage`，离开时刷新
+- **链接格式**: ~~`站内路径.md`~~ → [✓] 目标 slug（避开 `%`、`#`、空格转义）
+- **工具链**: npm 可选依赖 bug 会删 rolldown 原生二进制；`github-slugger` 需显式依赖；Bash 工具 `>>` 会覆盖文件（均见 known_pits）

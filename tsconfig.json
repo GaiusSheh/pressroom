@@ -1,0 +1,20 @@
+{
+	"compilerOptions": {
+		"inlineSourceMap": true,
+		"inlineSources": true,
+		"module": "ESNext",
+		"target": "ES2021",
+		"strict": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		// @quartz-community/utils 只通过 exports 子路径提供 ESM，需要 bundler 解析
+		"moduleResolution": "bundler",
+		"isolatedModules": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowSyntheticDefaultImports": true,
+		"lib": ["ES2021", "DOM"]
+	},
+	"include": ["src/**/*.ts", ".dev/unit-tests/**/*.ts"]
+}
