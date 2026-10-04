@@ -9,6 +9,8 @@ export interface ConfirmOptions {
 	destructive?: boolean;
 	/** 附带的一个勾选项（如撤稿时「一并更新引用它的笔记」） */
 	option?: { label: string; desc?: string; checked: boolean };
+	/** 可展开的清单（如切换模式时受影响的笔记） */
+	details?: { summary: string; items: string[] };
 }
 
 export interface ConfirmResult {
@@ -46,6 +48,12 @@ class ConfirmModal extends Modal {
 		const { contentEl, options } = this;
 		this.setTitle(options.title);
 		contentEl.createEl('p', { text: options.body });
+		if (options.details) {
+			const details = contentEl.createEl('details', { cls: 'pressroom-confirm-details' });
+			details.createEl('summary', { text: options.details.summary });
+			const list = details.createEl('ul');
+			for (const item of options.details.items) list.createEl('li', { text: item });
+		}
 		if (options.option) {
 			const opt = new Setting(contentEl).setName(options.option.label).addToggle((tg) =>
 				tg.setValue(this.checked).onChange((v) => {

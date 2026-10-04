@@ -85,3 +85,46 @@
 .pressroom-location-unpublished {
 	margin: var(--size-4-2) 0;
 }
+
+.pressroom-confirm-details {
+	margin: var(--size-4-2) 0;
+	font-size: var(--font-ui-small);
+}
+
+.pressroom-confirm-details ul {
+	max-height: 12em;
+	overflow-y: auto;
+}
+
+/* 连带清单：可能很长，限制高度滚动 */
+.pressroom-companions {
+	max-height: 18em;
+	overflow-y: auto;
+	margin: var(--size-4-2) 0;
+}
+
+.pressroom-companion-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-1) 0;
+	font-size: var(--font-ui-small);
+}
+
+.pressroom-companion-conflict {
+	color: var(--text-error);
+}
+
+/* 「全部站点」项与站点列表分隔 */
+.pressroom-suggestion-all {
+	border-top: 1px solid var(--background-modifier-border);
+	font-weight: var(--font-semibold);
+}
+
+.pressroom-notice-extra.mod-failed {
+	color: var(--text-error);
+}
+
+.pressroom-all-block {
+	margin-bottom: var(--size-4-4);
+}

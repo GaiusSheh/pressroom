@@ -28,13 +28,19 @@ describe('站内路径', () => {
 
 describe('commitMessage', () => {
 	it('只涉及一篇：沿用单篇格式', () => {
-		expect(commitMessage({ published: ['a.md'], updated: [], unpublished: [] })).toBe('Pressroom：发布 a.md');
-		expect(commitMessage({ published: [], updated: ['a.md'], unpublished: [] })).toBe('Pressroom：更新 a.md');
-		expect(commitMessage({ published: [], updated: [], unpublished: ['a.md'] })).toBe('Pressroom：撤稿 a.md');
+		expect(commitMessage({ published: ['a.md'], updated: [], unpublished: [], moved: [] })).toBe('Pressroom：发布 a.md');
+		expect(commitMessage({ published: [], updated: ['a.md'], unpublished: [], moved: [] })).toBe('Pressroom：更新 a.md');
+		expect(commitMessage({ published: [], updated: [], unpublished: ['a.md'], moved: [] })).toBe('Pressroom：撤稿 a.md');
+		expect(commitMessage({ published: [], updated: [], unpublished: [], moved: [{ from: 'a.md', to: 'x/a.md' }] })).toBe(
+			'Pressroom：挪动 a.md 到 x/a.md',
+		);
 	});
 	it('多篇：分段列出', () => {
-		expect(commitMessage({ published: ['a.md'], updated: ['b.md', 'c.md'], unpublished: ['d.md'] })).toBe(
+		expect(commitMessage({ published: ['a.md'], updated: ['b.md', 'c.md'], unpublished: ['d.md'], moved: [] })).toBe(
 			'Pressroom：发布 a.md；更新 b.md、c.md；撤稿 d.md',
+		);
+		expect(commitMessage({ published: ['a.md'], updated: [], unpublished: [], moved: [{ from: 'b.md', to: 'x/b.md' }] })).toBe(
+			'Pressroom：发布 a.md；挪动 b.md → x/b.md',
 		);
 	});
 });

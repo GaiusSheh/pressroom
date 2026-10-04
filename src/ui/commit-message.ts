@@ -4,17 +4,21 @@ import type { BatchSummary } from '../core/publish';
 import { t } from '../i18n';
 
 export function commitMessage(s: BatchSummary): string {
-	const total = s.published.length + s.updated.length + s.unpublished.length;
+	const total = s.published.length + s.updated.length + s.unpublished.length + s.moved.length;
 	// 只涉及一篇：沿用 Phase 2 的单篇格式
 	if (total === 1) {
 		if (s.published.length) return t('commit.published', { path: s.published[0]! });
 		if (s.updated.length) return t('commit.updated', { path: s.updated[0]! });
+		if (s.moved.length) return t('commit.moved', { from: s.moved[0]!.from, to: s.moved[0]!.to });
 		return t('commit.unpublished', { path: s.unpublished[0]! });
 	}
 	const sep = t('common.listSep');
 	const parts: string[] = [];
 	if (s.published.length) parts.push(t('commit.part.published', { paths: s.published.join(sep) }));
 	if (s.updated.length) parts.push(t('commit.part.updated', { paths: s.updated.join(sep) }));
+	if (s.moved.length) {
+		parts.push(t('commit.part.moved', { paths: s.moved.map((m) => t('commit.movePair', m)).join(sep) }));
+	}
 	if (s.unpublished.length) parts.push(t('commit.part.unpublished', { paths: s.unpublished.join(sep) }));
 	return t('commit.many', { parts: parts.join(t('commit.part.sep')) });
 }

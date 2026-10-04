@@ -19,38 +19,45 @@ export function chooseLocation(
 	vaultPath: string,
 	unpublishedLinks: string[] = [],
 ): Promise<string | undefined> {
-	return new Promise((resolve) => new LocationModal(app, site, snap, vaultPath, unpublishedLinks, resolve).open());
+	return new Promise((resolve) => new LocationModal(app, { site, snap, vaultPath, unpublishedLinks }, resolve).open());
 }
 
 /** 列表最多显示的名称数，其余以「等 N 篇」概括 */
 const MAX_LISTED = 5;
 
-class LocationModal extends Modal {
+export interface LocationInput {
+	site: SiteConfig;
+	snap: SiteSnapshot;
+	vaultPath: string;
+	unpublishedLinks: string[];
+}
+
+/**
+ * 一个手动站点的位置填写区（目录、名称、网址预览、冲突与忽略提示、未发布链接说明）。
+ * 单站弹窗与「全部站点」的分块弹窗共用
+ */
+export class LocationBlock {
 	private dir = '';
 	private name: string;
-	private done = false;
+	private previewEl?: HTMLElement;
+	private messageEl?: HTMLElement;
 
 	constructor(
-		app: App,
-		private readonly site: SiteConfig,
-		private readonly snap: SiteSnapshot,
-		private readonly vaultPath: string,
-		private readonly unpublishedLinks: string[],
-		private readonly resolve: (sitePath: string | undefined) => void,
+		private readonly app: App,
+		private readonly input: LocationInput,
+		/** 输入变化（调用方据此启用 / 禁用发布按钮） */
+		private readonly onChange: () => void,
 	) {
-		super(app);
-		this.name = stem(vaultPath);
+		this.name = stem(input.vaultPath);
 	}
 
-	onOpen() {
-		const { contentEl } = this;
-		this.setTitle(t('location.title', { site: this.site.name }));
-
+	render(el: HTMLElement) {
+		const { vaultPath, unpublishedLinks } = this.input;
 		let dirText: TextComponent | undefined;
 		let nameText: TextComponent | undefined;
-		const vaultDir = this.vaultPath.split('/').slice(0, -1).join('/');
+		const vaultDir = vaultPath.split('/').slice(0, -1).join('/');
 
-		new Setting(contentEl)
+		new Setting(el)
 			.setName(t('location.useVault'))
 			.setDesc(t('location.useVault.desc'))
 			.addToggle((tg) =>
@@ -58,14 +65,14 @@ class LocationModal extends Modal {
 					// 手动模式下是一次性的填入快捷方式，不留记录（需求 §5.1）
 					if (!on) return;
 					this.dir = vaultDir;
-					this.name = stem(this.vaultPath);
+					this.name = stem(vaultPath);
 					dirText?.setValue(this.dir);
 					nameText?.setValue(this.name);
 					this.refresh();
 				}),
 			);
 
-		new Setting(contentEl).setName(t('location.dir')).addText((text) => {
+		new Setting(el).setName(t('location.dir')).addText((text) => {
 			dirText = text;
 			text.setPlaceholder(t('location.dir.placeholder')).onChange((v) => {
 				this.dir = v;
@@ -77,7 +84,7 @@ class LocationModal extends Modal {
 			});
 		});
 
-		new Setting(contentEl).setName(t('location.name')).addText((text) => {
+		new Setting(el).setName(t('location.name')).addText((text) => {
 			nameText = text;
 			text.setValue(this.name).onChange((v) => {
 				this.name = v;
@@ -85,47 +92,32 @@ class LocationModal extends Modal {
 			});
 		});
 
-		const preview = new Setting(contentEl).setName(t('location.preview'));
+		const preview = new Setting(el).setName(t('location.preview'));
 		this.previewEl = preview.descEl;
-		this.messageEl = contentEl.createDiv({ cls: 'pressroom-location-messages' });
-		if (this.unpublishedLinks.length > 0) {
-			const shown = this.unpublishedLinks.slice(0, MAX_LISTED);
-			const rest = this.unpublishedLinks.length - shown.length;
+		this.messageEl = el.createDiv({ cls: 'pressroom-location-messages' });
+		if (unpublishedLinks.length > 0) {
+			const shown = unpublishedLinks.slice(0, MAX_LISTED);
+			const rest = unpublishedLinks.length - shown.length;
 			const names = shown.join(t('common.listSep')) + (rest > 0 ? t('location.andMore', { n: rest }) : '');
-			const box = contentEl.createDiv({ cls: 'pressroom-location-unpublished setting-item-description' });
+			const box = el.createDiv({ cls: 'pressroom-location-unpublished setting-item-description' });
 			box.createEl('p', { text: t('location.unpublishedLinks', { names }) });
 			box.createEl('p', { text: t('location.unpublishedHint') });
 		}
-
-		new Setting(contentEl)
-			.addButton((b) => b.setButtonText(t('common.cancel')).onClick(() => this.close()))
-			.addButton((b) => {
-				this.publishButton = b.buttonEl;
-				b.setButtonText(t('location.publish'))
-					.setCta()
-					.onClick(() => {
-						if (!this.valid()) return;
-						this.done = true;
-						this.resolve(joinSitePath(this.dir, this.name));
-						this.close();
-					});
-			});
 		this.refresh();
 	}
 
-	onClose() {
-		this.contentEl.empty();
-		if (!this.done) this.resolve(undefined);
+	valid(): boolean {
+		return this.check().errors.length === 0;
 	}
 
-	private previewEl?: HTMLElement;
-	private messageEl?: HTMLElement;
-	private publishButton?: HTMLButtonElement;
+	sitePath(): string {
+		return joinSitePath(this.dir, this.name);
+	}
 
 	/** 站上已有的目录（内容目录中所有文件的各级上级目录），供输入建议；附件目录不列出，避免把笔记发进去 */
 	private existingDirs(): string[] {
 		const dirs = new Set<string>();
-		for (const f of this.snap.contentFiles) {
+		for (const f of this.input.snap.contentFiles) {
 			if (f.path.startsWith(`${ASSETS_DIR}/`)) continue;
 			const parts = f.path.split('/').slice(0, -1);
 			for (let i = 1; i <= parts.length; i++) dirs.add(parts.slice(0, i).join('/'));
@@ -140,32 +132,70 @@ class LocationModal extends Modal {
 		if (!isValidName(this.name)) errors.push(t('location.invalidName'));
 		if (!isValidDir(this.dir)) errors.push(t('location.invalidDir'));
 		if (errors.length) return { errors, warnings };
-		const path = joinSitePath(this.dir, this.name);
-		const conflicts = findConflicts(path, slugOwners(this.snap));
+		const path = this.sitePath();
+		const conflicts = findConflicts(path, slugOwners(this.input.snap));
 		if (conflicts.length) {
 			const other = conflicts.map((c) => (c.owner.kind === 'file' ? c.owner.path : c.owner.alias)).join('、');
 			errors.push(t('location.conflict', { other }));
 		}
-		const pattern = matchIgnorePattern(path, this.snap.ignorePatterns);
+		const pattern = matchIgnorePattern(path, this.input.snap.ignorePatterns);
 		if (pattern) warnings.push(t('location.ignored', { pattern }));
 		return { errors, warnings };
 	}
 
-	private valid(): boolean {
-		return this.check().errors.length === 0;
-	}
-
 	private refresh() {
 		const { errors, warnings } = this.check();
-		if (this.previewEl) {
-			this.previewEl.setText(errors.length ? '' : urlOf(this.site.siteUrl, joinSitePath(this.dir, this.name)));
-		}
+		this.previewEl?.setText(errors.length ? '' : urlOf(this.input.site.siteUrl, this.sitePath()));
 		if (this.messageEl) {
 			this.messageEl.empty();
 			for (const e of errors) this.messageEl.createDiv({ text: e, cls: 'pressroom-conn-line mod-error' });
 			for (const w of warnings) this.messageEl.createDiv({ text: w, cls: 'pressroom-conn-line mod-warn' });
 		}
-		if (this.publishButton) this.publishButton.disabled = errors.length > 0;
+		this.onChange();
+	}
+}
+
+class LocationModal extends Modal {
+	private done = false;
+	private publishButton?: HTMLButtonElement;
+	private readonly block: LocationBlock;
+
+	constructor(
+		app: App,
+		private readonly input: LocationInput,
+		private readonly resolve: (sitePath: string | undefined) => void,
+	) {
+		super(app);
+		this.block = new LocationBlock(app, input, () => this.refresh());
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		this.setTitle(t('location.title', { site: this.input.site.name }));
+		this.block.render(contentEl);
+		new Setting(contentEl)
+			.addButton((b) => b.setButtonText(t('common.cancel')).onClick(() => this.close()))
+			.addButton((b) => {
+				this.publishButton = b.buttonEl;
+				b.setButtonText(t('location.publish'))
+					.setCta()
+					.onClick(() => {
+						if (!this.block.valid()) return;
+						this.done = true;
+						this.resolve(this.block.sitePath());
+						this.close();
+					});
+			});
+		this.refresh();
+	}
+
+	onClose() {
+		this.contentEl.empty();
+		if (!this.done) this.resolve(undefined);
+	}
+
+	private refresh() {
+		if (this.publishButton) this.publishButton.disabled = !this.block.valid();
 	}
 }
 

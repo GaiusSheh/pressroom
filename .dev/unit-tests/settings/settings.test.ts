@@ -50,6 +50,17 @@ describe('normalizeSettings', () => {
 		expect(settings.sites[0]).toEqual({ ...newSite('s1', 'A') });
 	});
 
+	it('待写回的改名：只保留现有站点与格式正确的条目', () => {
+		const ok = { id: 1, from: 'a.md', to: 'b.md' };
+		const { settings, warnings } = normalizeSettings({
+			sites: [newSite('s1', 'A')],
+			pendingRenames: { s1: [ok, { id: 'x', from: 'a.md' }], gone: [ok] },
+		});
+		expect(settings.pendingRenames).toEqual({ s1: [ok] });
+		expect(warnings).toHaveLength(1);
+		expect(normalizeSettings({ pendingRenames: [] }).settings.pendingRenames).toEqual({});
+	});
+
 	it('缺少 id 的站点被忽略并提示', () => {
 		const { settings, warnings } = normalizeSettings({ sites: [{ name: 'A' }, null] });
 		expect(settings.sites).toEqual([]);

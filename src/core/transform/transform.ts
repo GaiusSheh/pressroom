@@ -28,6 +28,11 @@ export interface TransformContext {
 	 * 本站隔离时不提供本函数；其他隔离站点不参与查询。缺省或返回 undefined → 纯文本
 	 */
 	crossSiteUrl?: (vaultPath: string) => string | undefined;
+	/**
+	 * Pressroom 为旧网址写入的 aliases（挪动后重定向，需求 §11）。不受属性白名单限制；
+	 * 笔记自带的 aliases 在白名单中时与之合并去重（笔记自带的在前）
+	 */
+	aliases?: string[];
 }
 
 /** 嵌入展开使用的 callout 类型（Quartz 内置，见 findings「Phase 3 callout 验证」） */
@@ -161,13 +166,18 @@ function render(note: ParsedNote, start: number, end: number, ctx: TransformCont
 	return out + note.text.slice(pos, end);
 }
 
-/** frontmatter 只保留白名单属性（按原顺序）；无剩余属性时去掉整个 frontmatter */
+/** frontmatter 只保留白名单属性（按原顺序），再加上 Pressroom 的 aliases；无剩余属性时去掉整个 frontmatter */
 function frontmatterBlock(note: ParsedNote, ctx: TransformContext): string {
-	const data = note.frontmatter?.data;
-	if (!data) return '';
+	const data = note.frontmatter?.data ?? {};
 	const kept: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(data)) {
 		if (ctx.whitelist.includes(key)) kept[key] = value;
+	}
+	if (ctx.aliases?.length) {
+		const own = kept.aliases;
+		// 笔记自带的 aliases 可能是字符串或列表
+		const ownList = Array.isArray(own) ? own.map(String) : typeof own === 'string' && own !== '' ? [own] : [];
+		kept.aliases = [...new Set([...ownList, ...ctx.aliases])];
 	}
 	if (Object.keys(kept).length === 0) return '';
 	const yaml = ctx.stringifyYaml(kept);

@@ -7,12 +7,15 @@ import { registerMenus } from './ui/menu';
 
 export default class PressroomPlugin extends Plugin {
 	settings!: PressroomSettings;
+	actions!: PressroomActions;
 
 	async onload() {
 		setLanguage(resolveLang(getLanguage()));
 		await this.loadSettings();
+		this.actions = new PressroomActions(this);
 		this.addSettingTab(new PressroomSettingTab(this.app, this));
-		registerMenus(this, new PressroomActions(this));
+		registerMenus(this, this.actions);
+		this.actions.renames.register();
 	}
 
 	onunload() {}

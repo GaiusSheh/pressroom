@@ -18,6 +18,8 @@ export interface SitePageHost {
 	/** 全部站点（仓库 + 分支重复检查） */
 	allSites(): SiteConfig[];
 	save(): Promise<void>;
+	/** 切换目录模式（写回仓库，可能弹确认框）；结束后以 site.mode 为准刷新 */
+	changeMode(site: SiteConfig, mode: DirMode): Promise<void>;
 	/** 确认后移除站点；用户取消返回 false */
 	remove(site: SiteConfig): Promise<boolean>;
 	/** 测试连接，返回要显示的结果行 */
@@ -82,7 +84,7 @@ export class SitePage extends SettingPage {
 			(v) => (site.siteUrl = v),
 		);
 
-		// 目录模式在 Phase 1 只存本地；写回仓库 manifest 与切换确认随 Phase 4 实现
+		// 目录模式写回仓库 manifest（需求 §5.2、§9）；失败或取消时恢复为实际模式
 		new Setting(el)
 			.setName(t('settings.site.mode'))
 			.setDesc(t('settings.site.mode.desc'))
@@ -94,8 +96,12 @@ export class SitePage extends SettingPage {
 					} satisfies Record<DirMode, string>)
 					.setValue(site.mode)
 					.onChange(async (value) => {
-						site.mode = value as DirMode;
-						await this.host.save();
+						dd.setDisabled(true);
+						try {
+							await this.host.changeMode(site, value as DirMode);
+						} finally {
+							dd.setValue(site.mode).setDisabled(false);
+						}
 					}),
 			);
 

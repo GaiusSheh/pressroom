@@ -34,6 +34,7 @@ export class PressroomSettingTab extends PluginSettingTab {
 			otherNames: (site) => this.settings.sites.filter((s) => s.id !== site.id).map((s) => s.name),
 			allSites: () => this.settings.sites,
 			save: () => this.plugin.saveSettings(),
+			changeMode: (site, mode) => this.plugin.actions.changeMode(site, mode),
 			remove: (site) => this.removeSite(site),
 			testConnection: (site) => this.testSite(site),
 			onLeave: () => this.update(),

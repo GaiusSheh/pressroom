@@ -78,6 +78,17 @@ describe('序列化', () => {
 		expect(text).toBe('{\n  "version": 1,\n  "mode": "follow",\n  "notes": [],\n  "attachments": []\n}\n');
 	});
 
+	it('plainLinks：非空时排序写入并往返一致，为空时不写入', () => {
+		const m = sample();
+		m.notes[0]!.plainLinks = ['乙.md', '甲.md', '乙.md'];
+		m.notes[1]!.plainLinks = [];
+		const text = serializeManifest(m);
+		const back = parseManifest(text);
+		expect(back.notes.find((n) => n.vaultPath === m.notes[0]!.vaultPath)!.plainLinks).toEqual(['乙.md', '甲.md'].sort());
+		expect(back.notes.find((n) => n.vaultPath === m.notes[1]!.vaultPath)).not.toHaveProperty('plainLinks');
+		expect(serializeManifest(sample())).not.toContain('plainLinks');
+	});
+
 	it('多余字段不写回', () => {
 		const m = sample() as ManifestV1 & { extra: number };
 		m.extra = 1;
@@ -119,6 +130,8 @@ describe('parseManifest 报错', () => {
 		expectError(mutate((m) => (m.attachments[1]!.sitePath = m.attachments[0]!.sitePath)), 'invalid', /attachments 中站内路径重复/));
 	it('笔记引用了未登记的附件', () =>
 		expectError(mutate((m) => m.notes[0]!.attachments.push('assets/ghost.png')), 'invalid', /ghost\.png 不在 attachments/));
+	it('plainLinks 路径非法', () =>
+		expectError(mutate((m) => ((m.notes[0] as { plainLinks?: unknown }).plainLinks = ['../x.md'])), 'invalid', /plainLinks\[0\]/));
 	it('alias 为空', () => expectError(mutate((m) => (m.notes[0]!.aliases = [''])), 'invalid', /aliases\[0\]/));
 });
 

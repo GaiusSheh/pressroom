@@ -19,6 +19,11 @@ export interface NoteRecord {
 	attachments: string[];
 	/** Pressroom 为旧网址写入的 aliases（挪动后重定向） */
 	aliases: string[];
+	/**
+	 * 跟随 vault 站点：上次发布时本篇中指向「未在本站发布」笔记、因而输出为纯文本的链接目标（vault 路径）。
+	 * 更新时只对不在此列的新链接询问连带发布（需求 §7）。为空时不写入文件
+	 */
+	plainLinks?: string[];
 }
 
 export interface AttachmentRecord {
@@ -149,6 +154,9 @@ export function parseManifest(text: string): ManifestV1 {
 				if (typeof s !== 'string' || s === '') v.fail(`${p}.aliases[${j}]`, '非空字符串', s);
 				return s;
 			}),
+			...(o.plainLinks === undefined
+				? {}
+				: { plainLinks: v.arr(o.plainLinks, `${p}.plainLinks`).map((s, j) => v.relPath(s, `${p}.plainLinks[${j}]`)) }),
 		};
 	});
 	v.unique(notes.map((n) => n.sitePath), 'notes', '站内路径');
@@ -177,6 +185,7 @@ export function serializeManifest(m: ManifestV1): string {
 				publishedAt: n.publishedAt,
 				attachments: sorted(n.attachments),
 				aliases: sorted(n.aliases),
+				...(n.plainLinks?.length ? { plainLinks: sorted(n.plainLinks) } : {}),
 			})),
 		attachments: [...m.attachments]
 			.sort((a, b) => byCodePoint(a.sitePath, b.sitePath))

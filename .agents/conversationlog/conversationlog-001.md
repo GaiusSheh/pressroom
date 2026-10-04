@@ -248,12 +248,66 @@
 
 ---
 
+## Session: 2026-10-04 Phase 4 多站点与目录模式
+
+**对话元数据**:
+- 时间: 2026-10-04 20:40 - 2026-10-05
+- 关键词: `Phase 4`, `跟随 vault`, `模式切换`, `已移动`, `aliases`, `改名监听`, `连带发布`, `全部站点`
+- 工作目录: `C:\Users\Shi_Y\OneDrive\Codes\my-tools\Pressroom`
+- 项目规则入口: `.agents/AGENTS.md`
+- 参与 agent:
+  - Claude Code (env: windows-native)
+    - Session ID: `38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 原始记录: `~/.claude/projects/c--Users-Shi-Y-OneDrive-Codes-my-tools-Pressroom/38707732-41c0-4ac4-85ce-53f3e848581e.jsonl`
+    - 恢复命令: `claude --resume 38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 备注：本会话在 Phase 4 计划阶段经历一次 compact；GUI 测试由派生的 general-purpose 子 agent 通过 windows-mcp 执行（VS Code 崩溃、Windows 锁屏各中断一次，均新开 agent 重跑）
+
+**快速恢复对话**：同环境用上方恢复命令；跨环境走 `skills/handover` 软接力，不 resume。
+
+### 核心技术决策
+
+#### 1. 改名后自动提交（用户决定 A）
+- vault 改名 / 移动后自动把各站点 manifest 的源路径写回仓库；几秒内多次改名合并为一次提交；离线或失败时记在本地，下次操作或插件加载时补提交
+- 未选「只记本地、随下次发布写回」：那样别的设备在此之前会把这篇看成「源笔记已删除」
+
+#### 2. 「已移动」笔记右键发布 = 同步（用户决定 A）
+- 跟随 vault 站点上，右键发布「已移动」的笔记：挪到新位置并更新内容，旧路径写入 aliases 让旧网址重定向；新位置冲突时拒绝
+- 批量的「一键同步 / 重排」仍在 Phase 5 管理面板，复用同一套 core
+
+#### 3. 更新时只问新出现的未发布链接（实施中决定，已向用户说明）
+- manifest 记录新增可选字段 `plainLinks`（跟随站点上次输出为纯文本的链接目标），为空不写入，已有 manifest 逐字节不变
+
+### 技术调整/突破
+
+**问题 1**：改名后、写回仓库前立即发布，会把改名后的笔记当成新笔记重复发布。
+**最终方案**：[✓] `PublishContext.renames` 在 `loadSnapshot` 中先把未写回的改名应用到 manifest，状态与发布都按新路径计算；映射幂等，不依赖文件夹改名触发几次事件。
+
+**问题 2**：aliases 写成什么路径才能在 Quartz 中正确跳转。
+**最终方案**：[✓] 读 alias-redirects 源码：不以 `./`、`../` 开头的别名按内容根解析 → 写旧站内路径去掉 `.md`；Quartz 实际构建验证 `改名/待改名.html` 跳转到 `改名/已改名`。
+
+**其他**：Bash 的 `>>` 第三次写坏文件（`styles.css`，追加内容覆盖了文件开头），从 HEAD 恢复，已补记 known_pits；全部站点都已是最新时汇总提示不再写「约 1 分钟后网站更新」（GUI 反馈）。
+
+### 重要代码与文档创建
+
+- `src/core/`：`publish.ts`（跟随站点路径、挪动与 aliases、`setMode`、`commitRenames`、`movedRecords`）、`renames.ts`、`companions.ts`、manifest `plainLinks`、transform 写入 aliases
+- `src/ui/`：`renames.ts`（改名队列）、`companions-modal.ts`、`publish-modal.ts`、`location-modal.ts`（拆出 `LocationBlock`）、`site-picker.ts`（全部站点）、`actions.ts`
+- `src/settings/`：模式切换写回仓库、`pendingRenames`
+- `.dev/unit-tests/publish/`：follow、renames、companions；共 387 项
+- 测试 vault：`连带/`、`改名/` 示例；`sandbox-reset.mjs` 复位 main 模式为手动
+- 计划：`.dev/plans/implemented/phase4-detailed-plan.md`
+
+### 下一步
+
+- 编写 Phase 5（管理面板：站点选项卡、站内目录树、单项操作、一键同步 / 更新 / 重排 / 清理已删除）详细计划
+
+---
+
 ## 统计信息
 
-- **记录的主题 Session 数量**：4 个
+- **记录的主题 Session 数量**：5 个
 - **关联的 agent 会话数量**：1 个（含多个派生的 GUI 测试子 agent）
 - **覆盖时间**：2026-10-03 ~ 2026-10-04
-- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离
+- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离、Phase 4 多站点与目录模式
 
 ---
 

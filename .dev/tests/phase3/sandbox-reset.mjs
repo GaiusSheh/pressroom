@@ -47,7 +47,8 @@ if (manifestEntry) {
 	const keptSitePaths = new Set(KEEP.filter((p) => p.startsWith(`${CONTENT_DIR}/`)).map((p) => p.slice(CONTENT_DIR.length + 1)));
 	const notes = m.notes.filter((n) => keptSitePaths.has(n.sitePath));
 	const used = new Set(notes.flatMap((n) => n.attachments));
-	const next = { ...m, notes, attachments: m.attachments.filter((a) => used.has(a.sitePath)) };
+	// Phase 4 起 main 的目录模式也复位为手动（Site 1 = 手动站点；Site 2 在 site2 分支上测跟随 vault）
+	const next = { ...m, mode: 'manual', notes, attachments: m.attachments.filter((a) => used.has(a.sitePath)) };
 	const text = `${JSON.stringify(next, null, 2)}\n`;
 	if (text !== (await blobText(manifestEntry.sha))) {
 		const blob = (await api('POST', '/git/blobs', { content: Buffer.from(text).toString('base64'), encoding: 'base64' })).json.sha;

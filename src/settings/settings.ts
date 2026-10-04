@@ -1,6 +1,12 @@
 // 插件设置（data.json）的结构、默认值与读取时的规整（纯函数，不依赖 obsidian）
 
+import type { Rename } from '../core/renames';
 import type { DirMode, LinkPolicy, SiteConfig } from '../core/types';
+
+/** 待写回仓库的一次改名；id 递增，用于提交成功后只移除已写回的条目 */
+export interface PendingRename extends Rename {
+	id: number;
+}
 
 export interface PressroomSettings {
 	sites: SiteConfig[];
@@ -12,6 +18,8 @@ export interface PressroomSettings {
 	linkPolicy: LinkPolicy;
 	/** 发布副本保留的 frontmatter 属性 */
 	propertyWhitelist: string[];
+	/** 尚未写回各站点仓库的 vault 改名（站点 id → 按发生顺序，需求 §9）；离线或失败时保留，之后补提交 */
+	pendingRenames: Record<string, PendingRename[]>;
 }
 
 export const DEFAULT_SETTINGS: PressroomSettings = {
@@ -20,6 +28,7 @@ export const DEFAULT_SETTINGS: PressroomSettings = {
 	excludedFolders: [],
 	linkPolicy: 'plain',
 	propertyWhitelist: ['title', 'tags', 'date', 'description'],
+	pendingRenames: {},
 };
 
 export function newSite(id: string, name: string): SiteConfig {
@@ -61,6 +70,30 @@ function normalizeSite(raw: unknown): SiteConfig | undefined {
 	};
 }
 
+const isPendingRename = (v: unknown): v is PendingRename => {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return typeof o.id === 'number' && Number.isInteger(o.id) && isString(o.from) && o.from !== '' && isString(o.to) && o.to !== '';
+};
+
+/** 待写回的改名：只保留现有站点的、格式正确的条目 */
+function normalizeRenames(raw: unknown, sites: SiteConfig[], warnings: string[]): Record<string, PendingRename[]> {
+	const out: Record<string, PendingRename[]> = {};
+	if (raw === undefined) return out;
+	if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+		warnings.push('设置项 pendingRenames 类型不正确，已清空');
+		return out;
+	}
+	const ids = new Set(sites.map((s) => s.id));
+	for (const [siteId, list] of Object.entries(raw as Record<string, unknown>)) {
+		if (!ids.has(siteId) || !Array.isArray(list)) continue;
+		const valid = list.filter(isPendingRename);
+		if (valid.length !== list.length) warnings.push(`站点 ${siteId} 有 ${list.length - valid.length} 条待写回的改名格式不正确，已忽略`);
+		if (valid.length) out[siteId] = valid;
+	}
+	return out;
+}
+
 /**
  * 把 loadData() 的结果规整为完整设置：缺失或类型不对的字段用默认值，未知字段丢弃。
  * 返回被丢弃 / 回退的字段说明，供调用方在控制台提示（设置文件损坏不应让插件无法加载）。
@@ -99,6 +132,7 @@ export function normalizeSettings(raw: unknown): { settings: PressroomSettings; 
 	return {
 		settings: {
 			sites,
+			pendingRenames: normalizeRenames(r.pendingRenames, sites, warnings),
 			tokenSecretId: pick('tokenSecretId', isString, d.tokenSecretId),
 			excludedFolders: pick('excludedFolders', isStringArray, d.excludedFolders),
 			linkPolicy: pick(
