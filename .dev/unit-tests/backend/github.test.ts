@@ -171,6 +171,28 @@ describe('错误分类与信息', () => {
 		expect(() => new GitHubBackend({ repo: 'bad', branch: 'main', token: 't', http: failing(200) })).toThrow(/owner\/repo/);
 	});
 
+	it('会变化的资源（仓库、分支指向、按分支读文件）绕过缓存；按 sha 读取的不加', async () => {
+		const fake = await FakeGitHub.create({ 'a.md': 'a' });
+		const seen: { url: string; cache?: string }[] = [];
+		const http: HttpFn = (req) => {
+			seen.push({ url: req.url.replace(/^.*\/repos\/[^/]+\/[^/]+/, ''), cache: req.headers['Cache-Control'] });
+			return fake.http(req);
+		};
+		const backend = new GitHubBackend({ repo: 'o/r', branch: 'main', token: fake.token, http });
+		await backend.getRepo();
+		const head = await backend.getHead();
+		const tree = await backend.getTree(head.treeSha);
+		await backend.readBlob(tree[0]!.sha);
+		await backend.readText('a.md');
+		const cacheOf = (prefix: string) => seen.find((s) => (prefix === '' ? s.url === '' : s.url.startsWith(prefix)))?.cache;
+		expect(cacheOf('')).toBe('no-cache');
+		expect(cacheOf('/git/ref/heads/')).toBe('no-cache');
+		expect(cacheOf('/contents/')).toBe('no-cache');
+		expect(cacheOf('/git/commits/')).toBeUndefined();
+		expect(cacheOf('/git/trees/')).toBeUndefined();
+		expect(cacheOf('/git/blobs/')).toBeUndefined();
+	});
+
 	it('请求带 token 与 API 版本头，有 body 时带 Content-Type', async () => {
 		const seen: Record<string, string>[] = [];
 		const http: HttpFn = async (req) => {

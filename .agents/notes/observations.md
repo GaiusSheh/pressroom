@@ -26,3 +26,13 @@
 - **`commit(message, build(head))`**：改动由回调按当前 head 生成，非 fast-forward 时重新取 head 再调用，调用方（发布流程）在回调内重读 manifest 即可正确合并。
 - **manifest 附件引用只记在笔记侧**，避免两处不一致；未来版本 manifest 读写都拒绝。
 - **测试连接无法验证写权限**：fine-grained token 的权限不在只读响应中体现，结果中明确说明「首次发布时确认」。
+
+## 2026-10-04 Phase 2 的实现决策
+
+依据：`.dev/plans/implemented/phase2-detailed-plan.md`
+
+- **vault 路径维持明文**（用户决定）：曾提出 manifest 存每站加盐哈希、或移到本机，用户选择维持需求现状，自行保证站点仓库私有；README 需提示（见 deferred）。
+- **解析交给 metadataCache，并校验偏移原文**：不自己写 Markdown 解析器，避免代码块等边界错误；校验 `original` 防止缓存过期时按错位偏移改写。
+- **快照从同一棵树按 blob 读 manifest 与 Quartz 配置**（`loadSnapshot`），保证与 head 一致，而不是用按分支读取的 contents API。
+- **GUI 测试交给 windows-mcp 子 agent**：用户不想逐项手点；agent 逐步操作 Obsidian 并用 gh 核对仓库，发现了单元测试测不到的 HTTP 缓存 bug。之后的阶段可沿用，注意：不要在屏幕上打开 `.env.local` 等敏感文件；Type 的 `clear=true` 清不掉 Obsidian 输入框，需 Ctrl+A。
+- **嵌入笔记临时纯文本、非图片嵌入输出为链接**：Phase 3 改为展开嵌入笔记时，`transform.ts` 中 `rewrite` 的 `note` 分支是改动点。

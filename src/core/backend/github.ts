@@ -57,15 +57,20 @@ export class GitHubBackend implements Backend {
 
 	/** 仓库本身是否可访问（区分「仓库不存在 / 无权」与「分支不存在」） */
 	async getRepo(): Promise<{ defaultBranch: string; private: boolean }> {
-		const res = await this.request('GET', '', undefined, '读取仓库信息');
+		const res = await this.request('GET', '', undefined, '读取仓库信息', { fresh: true });
 		const obj = asObject(res.json, '读取仓库信息');
 		return { defaultBranch: asString(obj, 'default_branch', '读取仓库信息'), private: obj.private === true };
 	}
 
 	async getHead(): Promise<Head> {
 		const what = `读取分支 ${this.opts.branch}`;
-		const ref = asObject((await this.request('GET', `/git/ref/heads/${encodePath(this.opts.branch)}`, undefined, what)).json, what);
+		// 分支指向会变：必须绕过 HTTP 缓存（GitHub 返回 max-age=60，读到旧 head 会导致误判与反复 422）
+		const ref = asObject(
+			(await this.request('GET', `/git/ref/heads/${encodePath(this.opts.branch)}`, undefined, what, { fresh: true })).json,
+			what,
+		);
 		const commitSha = asString(asObject(ref.object, what), 'sha', what);
+		// 按 sha 读取的 commit / tree / blob 内容不可变，允许缓存
 		const commit = asObject((await this.request('GET', `/git/commits/${commitSha}`, undefined, what)).json, what);
 		return { commitSha, treeSha: asString(asObject(commit.tree, what), 'sha', what) };
 	}
@@ -91,7 +96,7 @@ export class GitHubBackend implements Backend {
 			`/contents/${encodePath(path)}?ref=${encodeURIComponent(this.opts.branch)}`,
 			undefined,
 			what,
-			[404],
+			{ allow: [404], fresh: true },
 		);
 		if (res.status === 404) return undefined;
 		const obj = asObject(res.json, what);
@@ -109,18 +114,21 @@ export class GitHubBackend implements Backend {
 		return base64ToBytes(asString(obj, 'content', what));
 	}
 
-	async commit(message: string, build: (head: Head) => Change[] | Promise<Change[]>): Promise<CommitResult | undefined> {
+	async commit(
+		message: string | (() => string),
+		build: (head: Head) => Change[] | Promise<Change[]>,
+	): Promise<CommitResult | undefined> {
 		for (let attempt = 1; attempt <= this.maxRetries + 1; attempt++) {
 			const head = await this.getHead();
 			const changes = await build(head);
 			if (changes.length === 0) return undefined;
-			const commitSha = await this.createCommit(message, head, changes);
+			const commitSha = await this.createCommit(typeof message === 'function' ? message() : message, head, changes);
 			const res = await this.request(
 				'PATCH',
 				`/git/refs/heads/${encodePath(this.opts.branch)}`,
 				{ sha: commitSha, force: false },
 				`更新分支 ${this.opts.branch}`,
-				[422],
+				{ allow: [422] },
 			);
 			if (res.status !== 422) return { commitSha, attempts: attempt };
 			if (!/fast.?forward/i.test(githubMessage(res))) {
@@ -168,13 +176,17 @@ export class GitHubBackend implements Backend {
 		return asString(commit, 'sha', '创建提交');
 	}
 
-	/** 发请求；2xx 与 allow 中的状态码直接返回，其余抛 BackendError */
+	/**
+	 * 发请求；2xx 与 allow 中的状态码直接返回，其余抛 BackendError。
+	 * fresh：读取会变化的资源（仓库信息、分支指向、按分支读文件）时绕过 HTTP 缓存，
+	 * 否则 Obsidian（Chromium 网络层）会按 GitHub 的 Cache-Control: max-age=60 返回旧数据。
+	 */
 	private async request(
 		method: 'GET' | 'POST' | 'PATCH',
 		path: string,
 		body: unknown,
 		what: string,
-		allow: number[] = [],
+		{ allow = [], fresh = false }: { allow?: number[]; fresh?: boolean } = {},
 	): Promise<HttpResponse> {
 		const res = await this.opts.http({
 			method,
@@ -184,6 +196,7 @@ export class GitHubBackend implements Backend {
 				Accept: 'application/vnd.github+json',
 				'X-GitHub-Api-Version': '2022-11-28',
 				...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+				...(fresh ? { 'Cache-Control': 'no-cache' } : {}),
 			},
 			body: body === undefined ? undefined : JSON.stringify(body),
 		});

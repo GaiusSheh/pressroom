@@ -4,9 +4,11 @@
 免费开源的 Obsidian 发布插件：多站点、逐篇发布、零 frontmatter、带管理面板，目标生成器 Quartz 5、存储后端 GitHub，用于替换 Enveloppe。
 
 ## 当前状态
-- **阶段**: Phase 1 工程骨架与核心纯逻辑已完成（2026-10-03 验收通过）
-- **已有能力**: 设置页（站点、token、测试连接）；core 模块（Quartz 适配、GitHub 客户端、manifest）均有单元测试；尚无发布功能
-- **下一步**: 编写 Phase 2（单站发布闭环：右键发布 / 更新 / 撤稿 / 取链接）详细计划
+- **阶段**: Phase 2 单站发布闭环已完成（2026-10-04 验收通过）
+- **已有能力**: 右键 / 命令面板发布、更新、撤稿、取链接、打开网页；首次发布位置弹窗；frontmatter 白名单、链接改写、附件上传；已同步 / 有修改判定
+- **尚未实现**: 嵌入笔记展开、连带发布、站点隔离（Phase 3）；多站「全部站点」、跟随 vault 模式（Phase 4）；管理面板（Phase 5）
+- **下一步**: 编写 Phase 3（完整内容转换与隔离）详细计划
+- **待办**: `.agents/notes/deferred.md`（网址显示中文、测试 token 测完后撤销等）
 - **真相源**: 需求 `.dev/docs/requirements/v0/requirements.md`（当前为 v1）；总体计划 `.dev/plans/implementation_plan.md`；验证结论 `.dev/docs/others/phase0-findings.md`
 
 ## 关键技术决策
@@ -17,6 +19,9 @@
 - token 存 `secretStorage`，权限仅 Contents 读写
 - `minAppVersion` 1.13.0：设置页用声明式 API；站点子页面是自定义 `SettingPage`（子页面内不能调用 `update()`）
 - manifest 与内容在同一次提交写入；序列化稳定，内容不变则 blob SHA 不变
+- 发布 / 撤稿在 `commit(message, build(head))` 回调中基于当次 head 重读 manifest 与文件树；读取会变化的资源必须带 `fresh`（`Cache-Control: no-cache`），否则 `requestUrl` 会用 GitHub 的 60 秒缓存
+- 笔记中链接 / 嵌入的位置取自 `metadataCache`，core 只按偏移替换，不自己解析 Markdown
+- manifest 中 vault 路径为明文（用户决定），站点仓库应为私有
 
 ## 项目约定
 

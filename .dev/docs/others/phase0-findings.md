@@ -95,6 +95,12 @@
 - 别名网址规则：`slugifyFilePath(别名 + ".md")`（已以 `.md` 结尾则不补），与 note-properties 插件 `getAliasSlugs` 一致。`permalink` 不经 slug 原样加入 aliases。
 - Quartz 配置中的 `configuration.ignorePatterns` 匹配的文件不会被构建（默认含 `private`、`templates`）；`readSiteConfig` 已读出，发布到被忽略路径的提示在 Phase 2 实现。
 
+### Phase 2 附件链接验证（2026-10-03，`.dev/tests/phase2/quartz/attachment-e2e.mjs`）
+- Quartz 把附件按 **slug 后的路径** 输出到 public（`assets/图 1.png` → `assets/图-1.png`，`My Image.png` → `my-image.png`，`文档 A.pdf` → `文档-a.pdf`）。
+- **附件链接直接复用 `formatLink`**：图片在前面加 `!`（`![图](<assets/图-1.png>)`），其他文件为普通链接；三种策略 × 3 个深度全部指向存在的文件。
+- 对照：原文件名写法（尖括号、维基嵌入）在 shortest / absolute 下可用，但 **relative 下从子目录引用会失效**（被解析为相对源文件目录）→ 附件链接同样统一写 slug。
+- 嵌入的非图片附件（`![[资料.pdf]]`）若输出 `![](x.pdf)` 会被当作坏图片 → Phase 2 统一输出为普通链接；图片扩展名：png、jpg、jpeg、gif、webp、svg、bmp、avif。
+
 ---
 
 ## 0-3 aliases 重定向（需求 §11 待定问题）

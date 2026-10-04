@@ -132,12 +132,67 @@
 
 ---
 
+## Session: 2026-10-03 ~ 2026-10-04 Phase 2 单站发布闭环
+
+**对话元数据**:
+- 时间: 2026-10-03 23:00 - 2026-10-04 16:15
+- 关键词: `Phase 2`, `metadataCache`, `transform`, `attachments`, `publish`, `位置弹窗`, `requestUrl 缓存`, `windows-mcp GUI 测试`
+- 工作目录: `C:\Users\Shi_Y\OneDrive\Codes\my-tools\Pressroom`
+- 项目规则入口: `.agents/AGENTS.md`
+- 参与 agent:
+  - Claude Code (env: windows-native)
+    - Session ID: `38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 原始记录: `~/.claude/projects/c--Users-Shi-Y-OneDrive-Codes-my-tools-Pressroom/38707732-41c0-4ac4-85ce-53f3e848581e.jsonl`
+    - 恢复命令: `claude --resume 38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 备注：GUI 测试由本会话派生的 general-purpose 子 agent 通过 windows-mcp 操作 Obsidian 完成（其记录在本会话的子 agent 目录下）；期间进程中断一次，同一会话恢复
+
+**快速恢复对话**：同环境用上方恢复命令；跨环境走 `skills/handover` 软接力，不 resume。
+
+### 核心技术决策
+
+#### 1. 用户决定（计划阶段）
+- manifest 中 vault 路径**维持明文**，由用户自行保证站点仓库私有（曾提出每站加盐哈希、移到本机两种替代，未采用）；README 需提示
+- 嵌入笔记 `![[笔记]]` 在 Phase 2 临时变为纯文本；普通链接指向的附件 `[[资料.pdf]]` 也上传
+- 网址预览 / 提示中显示中文而非百分号编码：之后再做（deferred）
+- 测试 token 截屏泄露：风险可控，全部测试结束后再撤销（deferred）
+
+#### 2. 实现要点
+- 笔记解析交给 Obsidian `metadataCache`，并校验缓存偏移处原文与 `original` 一致（取代计划中的开发期调试输出）
+- 附件链接复用 `formatLink`（Quartz 实测：原文件名写法在 relative 下失效）；非图片嵌入输出为普通链接
+- 发布、更新、撤稿都在 `commit(message, build(head))` 回调里基于当次 head 计算；提交信息改为可延后求值的函数
+- 状态判定并入 `publish.ts`；位置弹窗用 `AbstractInputSuggest` 做目录建议（排除 `assets/`）
+
+### 技术调整/突破
+
+**问题描述**：GUI 测试中，提交后约 1 分钟内再次操作，误报「发布期间分支持续被其他来源更新」，或误报「已是最新」（仓库残留指向已撤稿页面的链接）；重试即正常。单元测试未能发现。
+
+**根本原因**：GitHub API 对 `git/ref/heads/*`、`contents/*` 返回 `Cache-Control: private, max-age=60`，Obsidian `requestUrl`（Chromium 网络层）遵守缓存，读到旧 head 与旧 manifest。
+
+**最终方案**：[✓] 会变化的资源（仓库信息、分支指向、按分支读文件）请求加 `Cache-Control: no-cache`；按 sha 读取的保留缓存。回归测试在 60 秒内连续「发布 → 发布 → 撤稿 → 发布」全部正确（已入 known_pits）。
+
+**其他观察**：`[[笔记#标题]]` 的 displayText 为「笔记 > 标题」（与 Obsidian 阅读模式一致）；windows-mcp 的 `Type` 加 `clear=true` 清不掉输入框，需 Ctrl+A 后删除；Snapshot 偶发 300 秒超时，可改用 Screenshot。
+
+### 重要代码与文档创建
+
+- `src/core/`：`note.ts`、`transform/transform.ts`、`attachments.ts`、`publish.ts`、`site-path.ts`、`generator/ignore.ts`
+- `src/platform/vault.ts`；`src/ui/`：`actions.ts`、`menu.ts`、`location-modal.ts`、`errors.ts`，扩展 `site-picker.ts`
+- `.dev/unit-tests/`：transform、attachments、publish（含 ui-helpers）、generator/ignore，共 310 项
+- `.dev/tests/phase2/quartz/`：`attachment-e2e.mjs`（附件链接）、`sandbox-build.mjs`（测试仓库内容的 Quartz 构建检查）
+- `.dev/plans/implemented/phase2-detailed-plan.md`
+
+### 下一步
+
+- 编写 Phase 3（完整内容转换与隔离：嵌入展开、连带发布、站点隔离）详细计划
+- 多站点选择与灰显的验证留到 Phase 4
+
+---
+
 ## 统计信息
 
-- **记录的主题 Session 数量**：2 个
-- **关联的 agent 会话数量**：1 个
-- **覆盖时间**：2026-10-03 ~ 2026-10-03
-- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑
+- **记录的主题 Session 数量**：3 个
+- **关联的 agent 会话数量**：1 个（含 1 个派生的 GUI 测试子 agent）
+- **覆盖时间**：2026-10-03 ~ 2026-10-04
+- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环
 
 ---
 

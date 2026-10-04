@@ -2,6 +2,8 @@ import { Plugin, getLanguage } from 'obsidian';
 import { resolveLang, setLanguage } from './i18n';
 import { type PressroomSettings, normalizeSettings } from './settings/settings';
 import { PressroomSettingTab } from './settings/tab';
+import { PressroomActions } from './ui/actions';
+import { registerMenus } from './ui/menu';
 
 export default class PressroomPlugin extends Plugin {
 	settings!: PressroomSettings;
@@ -10,6 +12,7 @@ export default class PressroomPlugin extends Plugin {
 		setLanguage(resolveLang(getLanguage()));
 		await this.loadSettings();
 		this.addSettingTab(new PressroomSettingTab(this.app, this));
+		registerMenus(this, new PressroomActions(this));
 	}
 
 	onunload() {}

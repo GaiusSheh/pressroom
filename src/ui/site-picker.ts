@@ -1,19 +1,27 @@
 import { App, SuggestModal } from 'obsidian';
 import type { SiteConfig } from '../core/types';
 
-/** 站点选择弹窗（需求 §4 方案 B：一级菜单项 + 站点列表）。选中返回站点，关闭返回 undefined */
-export function pickSite(app: App, sites: SiteConfig[], placeholder: string): Promise<SiteConfig | undefined> {
+export interface SiteItem {
+	site: SiteConfig;
+	/** 显示在站点名后的状态，如「✓ 已同步」 */
+	note?: string;
+	/** 灰显且不可选（如撤稿时未发布的站点） */
+	disabled?: boolean;
+}
+
+/** 站点选择弹窗（需求 §4 方案 B：一级菜单项 + 站点列表）。选中返回站点，关闭或选中灰显项返回 undefined */
+export function pickSite(app: App, items: SiteItem[], placeholder: string): Promise<SiteConfig | undefined> {
 	return new Promise((resolve) => {
-		new SitePickerModal(app, sites, placeholder, resolve).open();
+		new SitePickerModal(app, items, placeholder, resolve).open();
 	});
 }
 
-class SitePickerModal extends SuggestModal<SiteConfig> {
+class SitePickerModal extends SuggestModal<SiteItem> {
 	private chosen = false;
 
 	constructor(
 		app: App,
-		private readonly sites: SiteConfig[],
+		private readonly items: SiteItem[],
 		placeholder: string,
 		private readonly resolve: (site: SiteConfig | undefined) => void,
 	) {
@@ -21,19 +29,21 @@ class SitePickerModal extends SuggestModal<SiteConfig> {
 		this.setPlaceholder(placeholder);
 	}
 
-	getSuggestions(query: string): SiteConfig[] {
+	getSuggestions(query: string): SiteItem[] {
 		const q = query.trim().toLowerCase();
-		return this.sites.filter((s) => s.name.toLowerCase().includes(q) || s.repo.toLowerCase().includes(q));
+		return this.items.filter((i) => i.site.name.toLowerCase().includes(q) || i.site.repo.toLowerCase().includes(q));
 	}
 
-	renderSuggestion(site: SiteConfig, el: HTMLElement): void {
-		el.createDiv({ text: site.name });
-		el.createEl('small', { text: site.repo, cls: 'pressroom-suggestion-note' });
+	renderSuggestion(item: SiteItem, el: HTMLElement): void {
+		if (item.disabled) el.addClass('pressroom-suggestion-disabled');
+		const row = el.createDiv({ cls: 'pressroom-suggestion-row' });
+		row.createSpan({ text: item.site.name });
+		if (item.note) row.createSpan({ text: item.note, cls: 'pressroom-suggestion-note' });
 	}
 
-	onChooseSuggestion(site: SiteConfig): void {
+	onChooseSuggestion(item: SiteItem): void {
 		this.chosen = true;
-		this.resolve(site);
+		this.resolve(item.disabled ? undefined : item.site);
 	}
 
 	onClose(): void {

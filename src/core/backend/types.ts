@@ -56,8 +56,12 @@ export interface Backend {
 	/**
 	 * 一次提交。build 根据当前 head 生成改动；分支在此期间被别处更新（非 fast-forward）时，
 	 * 重新取 head、再次调用 build，有上限地重试。build 返回空数组时不提交并返回 undefined。
+	 * message 可为函数：在每次 build 之后求值（提交信息依赖 build 中才确定的内容时使用）。
 	 */
-	commit(message: string, build: (head: Head) => Change[] | Promise<Change[]>): Promise<CommitResult | undefined>;
+	commit(
+		message: string | (() => string),
+		build: (head: Head) => Change[] | Promise<Change[]>,
+	): Promise<CommitResult | undefined>;
 }
 
 export type BackendErrorKind =

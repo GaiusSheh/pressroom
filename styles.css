@@ -37,3 +37,31 @@
 .pressroom-suggestion-note {
 	color: var(--text-muted);
 }
+
+.pressroom-suggestion-row {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--size-4-4);
+}
+
+.pressroom-suggestion-disabled {
+	opacity: 0.5;
+}
+
+.pressroom-location-messages {
+	margin: var(--size-4-2) 0;
+	font-size: var(--font-ui-small);
+}
+
+/* 位置弹窗中错误 / 警告整行着色，比只有符号着色更醒目 */
+.pressroom-location-messages .mod-error {
+	color: var(--text-error);
+}
+
+.pressroom-location-messages .mod-warn {
+	color: var(--text-warning);
+}
+
+.pressroom-notice-button {
+	margin-top: var(--size-4-2);
+}
