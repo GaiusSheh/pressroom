@@ -4,10 +4,11 @@
 免费开源的 Obsidian 发布插件：多站点、逐篇发布、零 frontmatter、带管理面板，目标生成器 Quartz 5、存储后端 GitHub，用于替换 Enveloppe。
 
 ## 当前状态
-- **阶段**: Phase 2 单站发布闭环已完成（2026-10-04 验收通过）
-- **已有能力**: 右键 / 命令面板发布、更新、撤稿、取链接、打开网页；首次发布位置弹窗；frontmatter 白名单、链接改写、附件上传；已同步 / 有修改判定
-- **尚未实现**: 嵌入笔记展开、连带发布、站点隔离（Phase 3）；多站「全部站点」、跟随 vault 模式（Phase 4）；管理面板（Phase 5）
-- **下一步**: 编写 Phase 3（完整内容转换与隔离）详细计划
+- **阶段**: Phase 3 完整内容转换与隔离已完成（2026-10-04 验收通过）
+- **已有能力**: 手动站点的发布 / 更新 / 撤稿 / 取链接 / 打开网页；内容转换（白名单、链接、附件、嵌入展开为 callout）；跨站链接与隔离；反向链接提醒；多篇一次提交（`publishBatch`）；多站选择
+- **尚未实现**: 「全部站点」、跟随 vault 模式、改名监听、连带发布（Phase 4）；管理面板（Phase 5）
+- **下一步**: 编写 Phase 4（多站点与目录模式）详细计划
+- **测试**: 测试前运行 `.dev/tests/phase3/sandbox-reset.mjs` 复位测试仓库；第二个测试站点用测试仓库的 `site2` 分支；GUI 测试交给 windows-mcp 子 agent（每轮新开）
 - **待办**: `.agents/notes/deferred.md`（网址显示中文、测试 token 测完后撤销等）
 - **真相源**: 需求 `.dev/docs/requirements/v0/requirements.md`（当前为 v1）；总体计划 `.dev/plans/implementation_plan.md`；验证结论 `.dev/docs/others/phase0-findings.md`
 
@@ -22,6 +23,9 @@
 - 发布 / 撤稿在 `commit(message, build(head))` 回调中基于当次 head 重读 manifest 与文件树；读取会变化的资源必须带 `fresh`（`Cache-Control: no-cache`），否则 `requestUrl` 会用 GitHub 的 60 秒缓存
 - 笔记中链接 / 嵌入的位置取自 `metadataCache`，core 只按偏移替换，不自己解析 Markdown
 - manifest 中 vault 路径为明文（用户决定），站点仓库应为私有
+- 每个站点的「仓库 + 分支」必须唯一（manifest 在分支根目录，共用会互相误判）；同仓库不同分支允许
+- 连带发布只在跟随 vault 站点提供；手动站点未发布链接一律纯文本，靠反向链接提醒补链接（不自动更新）
+- 设置页文本字段离开输入框或按回车时才保存，不要改回每次按键保存
 
 ## 项目约定
 

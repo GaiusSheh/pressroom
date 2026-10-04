@@ -10,7 +10,8 @@ export const en = {
 	'settings.excluded.desc':
 		'Notes in these folders can never be published or pulled in by links. One folder per line.',
 	'settings.linkPolicy.name': 'Links to unpublished notes',
-	'settings.linkPolicy.desc': 'Default choice in the publish dialog.',
+	'settings.linkPolicy.desc':
+		'Default choice in the publish dialog. Only applies to sites in "Follow vault" mode; on manual sites these links always show as plain text.',
 	'settings.linkPolicy.plain': 'Turn into plain text',
 	'settings.linkPolicy.one': 'Publish linked notes (one level)',
 	'settings.linkPolicy.all': 'Publish linked notes (all levels)',
@@ -83,6 +84,8 @@ export const en = {
 	'error.contentDir': 'Use a folder path inside the repository, without . or .. segments.',
 	'error.url': 'Enter a full URL starting with https://',
 	'error.nameDuplicate': 'Another site already uses this name.',
+	'error.repoBranchTaken':
+		'Site "{name}" already uses this branch of this repository. Each site needs its own repository or branch.',
 
 	'notice.published': 'Published to {site}. The site will update in about a minute.',
 	'notice.updated': 'Updated on {site}. The site will update in about a minute.',
@@ -92,9 +95,13 @@ export const en = {
 	'notice.linkCopied': 'Link copied: {url}',
 	'notice.copyLink': 'Copy link',
 	'notice.noSites': 'No complete site yet. Add one in Pressroom settings.',
+	'notice.repoClash':
+		'These sites use the same branch of the same repository and are skipped until you change one of them in settings: {names}',
 	'notice.excluded': 'This note is in an excluded folder and cannot be published.',
 	'notice.loading': 'Reading sites…',
 	'notice.working': 'Publishing to {site}…',
+	'notice.updating': 'Updating notes on {site}…',
+	'notice.unpublishing': 'Unpublishing from {site}…',
 
 	'menu.publish': 'Pressroom: Publish…',
 	'menu.unpublish': 'Pressroom: Unpublish…',
@@ -128,7 +135,10 @@ export const en = {
 	'location.ignored': 'This location matches the ignore pattern "{pattern}" of the site, so Quartz will not build it.',
 	'location.invalidName': 'The name cannot be empty or contain / or \\.',
 	'location.invalidDir': 'The folder cannot contain . or .. segments.',
-	'location.plainLinks': 'Links to notes that are not published on this site will become plain text.',
+	'location.unpublishedLinks': 'These linked notes are not published on this site yet, so links to them will show as plain text: {names}',
+	'location.unpublishedHint':
+		'You can publish this note first. Once they are published, Pressroom will remind you to update this note, and the links will start working.',
+	'location.andMore': ' and {n} more',
 	'location.publish': 'Publish',
 
 	'error.conflict': '{path} conflicts with {other}.',
@@ -137,6 +147,18 @@ export const en = {
 	'error.manifestInvalid': 'The site manifest is damaged: {message}',
 	'error.generic': 'Failed: {message}',
 
+	'notice.backlinks': '{n} published notes link to it. Update them now to turn those links on. This also publishes any other changes in those notes.',
+	'notice.backlinks.button': 'Update {n} notes',
+	'notice.backlinks.done': 'Updated {n} notes on {site}.',
+	'unpublish.alsoUpdate': 'Also update {n} published notes that link to it',
+	'unpublish.alsoUpdate.desc': '{names}. Their links to this note become plain text. This also publishes any other changes in those notes.',
+	'common.listSep': ', ',
+
+	'commit.many': 'Pressroom: {parts}',
+	'commit.part.published': 'publish {paths}',
+	'commit.part.updated': 'update {paths}',
+	'commit.part.unpublished': 'unpublish {paths}',
+	'commit.part.sep': '; ',
 	'commit.published': 'Pressroom: publish {path}',
 	'commit.updated': 'Pressroom: update {path}',
 	'commit.unpublished': 'Pressroom: unpublish {path}',

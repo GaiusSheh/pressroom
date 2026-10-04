@@ -101,6 +101,11 @@
 - 对照：原文件名写法（尖括号、维基嵌入）在 shortest / absolute 下可用，但 **relative 下从子目录引用会失效**（被解析为相对源文件目录）→ 附件链接同样统一写 slug。
 - 嵌入的非图片附件（`![[资料.pdf]]`）若输出 `![](x.pdf)` 会被当作坏图片 → Phase 2 统一输出为普通链接；图片扩展名：png、jpg、jpeg、gif、webp、svg、bmp、avif。
 
+### Phase 3 callout 验证（2026-10-04，`.dev/tests/phase3/quartz/callout-probe.mjs`）
+- Quartz 5 正确渲染：内置类型 `quote` / `note`、自定义类型 `embed`（`data-callout` 为原值）、**嵌套 callout**（`> > [!quote]`）、**列表项中缩进的 callout**、callout 内的链接 / 图片 / 小标题 / 列表、**标题为链接**（`> [!quote] [标题](<路径>)`）。
+- 嵌入展开选用内置 `quote` 类型；被嵌入笔记在本站发布时 callout 标题链接到它。
+- 注意：callout 内的小标题会进入 Quartz 的目录（TOC）。
+
 ---
 
 ## 0-3 aliases 重定向（需求 §11 待定问题）

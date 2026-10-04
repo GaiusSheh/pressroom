@@ -32,6 +32,7 @@ export class PressroomSettingTab extends PluginSettingTab {
 		super(app, plugin);
 		this.siteHost = {
 			otherNames: (site) => this.settings.sites.filter((s) => s.id !== site.id).map((s) => s.name),
+			allSites: () => this.settings.sites,
 			save: () => this.plugin.saveSettings(),
 			remove: (site) => this.removeSite(site),
 			testConnection: (site) => this.testSite(site),

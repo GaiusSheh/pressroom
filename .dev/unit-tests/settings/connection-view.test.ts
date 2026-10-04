@@ -24,7 +24,8 @@ beforeAll(() => setLanguage('zh'));
 describe('describeConnection', () => {
 	it('全部正常：均为 ok，含文件数、策略、别名与写权限说明', () => {
 		const lines = describeConnection(done(), site);
-		expect(lines.every((l) => l.level === 'ok')).toBe(true);
+		// 检查项为 ok，最后一行写入权限说明为中性的 info
+		expect(lines.map((l) => l.level)).toEqual(['ok', 'ok', 'ok', 'ok', 'info']);
 		expect(lines.map((l) => l.text)).toEqual([
 			'已连接 owner/repo 的 main 分支。',
 			'内容目录 content：共 3 个文件。',

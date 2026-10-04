@@ -187,12 +187,73 @@
 
 ---
 
+## Session: 2026-10-04 Phase 3 完整内容转换与隔离
+
+**对话元数据**:
+- 时间: 2026-10-04 16:20 - 20:35
+- 关键词: `Phase 3`, `publishBatch`, `嵌入展开`, `callout`, `跨站链接`, `站点隔离`, `反向链接提醒`, `同仓库同分支`, `设置页保存时机`
+- 工作目录: `C:\Users\Shi_Y\OneDrive\Codes\my-tools\Pressroom`
+- 项目规则入口: `.agents/AGENTS.md`
+- 参与 agent:
+  - Claude Code (env: windows-native)
+    - Session ID: `38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 原始记录: `~/.claude/projects/c--Users-Shi-Y-OneDrive-Codes-my-tools-Pressroom/38707732-41c0-4ac4-85ce-53f3e848581e.jsonl`
+    - 恢复命令: `claude --resume 38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 备注：GUI 测试由本会话派生的多个 general-purpose 子 agent 通过 windows-mcp 执行（两次因会话额度上限中断，改为每轮新开 agent）
+
+**快速恢复对话**：同环境用上方恢复命令；跨环境走 `skills/handover` 软接力，不 resume。
+
+### 核心技术决策
+
+#### 1. 连带发布只在跟随 vault 站点提供（用户提出）
+- 讨论连带笔记在手动站点的默认位置时，用户指出：跟随 vault 站点位置天然确定；手动站点应由用户先发布另一篇，而不是插件替用户放置 → 连带发布整体移到 Phase 4
+- 手动站点首次发布弹窗列出未发布链接，并写明「你可以先发布这一篇。等它们发布后，Pressroom 会提醒你更新这一篇，链接就会生效」（用户要求写清楚，免得担心回不来）
+
+#### 2. 反向链接提醒（用户追问引出）
+- 用户问：选了纯文本、之后发布了被链接的笔记，原笔记会更新吗？会不会死循环？
+- 决定：不自动更新（会带上其他未发布改动），发布后提示「一并更新」、撤稿时默认一并更新；只影响一层，重新发布已在站上的笔记不改变站上笔记集合，不会循环
+
+#### 3. 其他用户决定
+- 跨站链接：非隔离站点输出他站网址；任一方隔离 → 纯文本；优先本站
+- 嵌入展开：callout 带来源标题（Quartz 内置 `quote`）
+- 更新时出现新未发布链接（跟随 vault 站点）：按设置默认，连带时弹清单
+- 同一仓库同一分支禁止配两个站点；同仓库不同分支允许
+
+### 技术调整/突破
+
+**问题 1**：GUI 测试中第二个站点用同一仓库的另一个内容目录，两站共用分支根目录的 manifest，互相把对方的发布当成自己的（生成站内死链、状态误判）。
+**最终方案**：[✓] 禁止同仓库同分支（`findRepoBranchClash`：设置页字段校验 + 操作入口跳过）；测试用 `site2` 分支。
+
+**问题 2**：`[[笔记#标题]]` 的 displayText 自动为「笔记 > 标题」，被当成用户别名，callout 标题用了文件名。
+**最终方案**：[✓] 自定义显示文字按原文判断（维基链接看 `|`）。
+
+**问题 3**：设置页每次按键合法即保存，用户把分支 `main` 改为冲突值时，打到一半的 `mai` 被存下，测试连接读到不存在的分支。
+**最终方案**：[✓] 离开输入框或按回车时才保存，打字时只显示校验结果。
+
+**其他**：块标记 `^id` 带进宿主页 → 展开时去掉；跨站笔记被误列为「将显示为纯文本」→ 与转换共用跨站查询；一并更新 / 撤稿无进度提示 → 加进度与 10 秒完成提示；站点读取慢 → 笔记只准备一次、快照并行（首次仍约 8 秒，见 deferred）。
+
+### 重要代码与文档创建
+
+- `src/core/`：`publish.ts`（`publishBatch`、`prepareNote`、`crossSiteLookup`）、`transform/embed.ts`、`backlinks.ts`
+- `src/ui/`：`commit-message.ts`；`confirm-modal.ts` 支持勾选项；`location-modal.ts` 未发布链接说明；`actions.ts` 跨站、反向链接、进度提示
+- `src/settings/`：`validate.ts`（`findRepoBranchClash`）、`site-page.ts`（离开输入框时保存、字段联动校验）
+- `.dev/unit-tests/`：batch、cross-site、backlinks、embed、fake-vault；共 354 项
+- `.dev/tests/phase3/`：`quartz/callout-probe.mjs`、`sandbox-reset.mjs`
+- 需求 v1：§3 仓库 + 分支唯一、§7 连带发布范围与反向链接提醒、§8 跨站链接规则
+
+### 下一步
+
+- 编写 Phase 4（多站点与目录模式：全部站点、跟随 vault、改名监听、连带发布）详细计划
+- 测试前运行 `sandbox-reset.mjs` 复位测试仓库；GUI 测试前关闭 VS Code 中的 `.env.local`
+
+---
+
 ## 统计信息
 
-- **记录的主题 Session 数量**：3 个
-- **关联的 agent 会话数量**：1 个（含 1 个派生的 GUI 测试子 agent）
+- **记录的主题 Session 数量**：4 个
+- **关联的 agent 会话数量**：1 个（含多个派生的 GUI 测试子 agent）
 - **覆盖时间**：2026-10-03 ~ 2026-10-04
-- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环
+- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离
 
 ---
 

@@ -5,6 +5,7 @@ import {
 	checkRepo,
 	checkSiteName,
 	checkSiteUrl,
+	findRepoBranchClash,
 	parseFolders,
 	parseList,
 } from '../../../src/settings/validate';
@@ -77,6 +78,22 @@ describe('checkSiteName', () => {
 	});
 	it('重名（忽略大小写与空白）', () => {
 		expect(checkSiteName('Blog', [' blog '])).toEqual({ error: 'error.nameDuplicate' });
+	});
+});
+
+describe('findRepoBranchClash', () => {
+	const s = (id: string, repo: string, branch: string) => ({ id, name: id, repo, branch });
+	const sites = [s('a', 'Owner/Repo', 'main'), s('b', 'owner/repo', 'site2'), s('c', 'owner/other', 'main')];
+	it('同仓库（忽略大小写）同分支 → 冲突', () => {
+		expect(findRepoBranchClash(s('x', 'owner/repo', 'main'), sites)?.id).toBe('a');
+	});
+	it('同仓库不同分支、不同仓库同分支 → 不冲突', () => {
+		expect(findRepoBranchClash(s('x', 'owner/repo', 'dev'), sites)).toBeUndefined();
+		expect(findRepoBranchClash(s('x', 'owner/third', 'main'), sites)).toBeUndefined();
+	});
+	it('不与自身比较；仓库或分支为空时不判断', () => {
+		expect(findRepoBranchClash(s('a', 'Owner/Repo', 'main'), sites)).toBeUndefined();
+		expect(findRepoBranchClash(s('x', '', 'main'), sites)).toBeUndefined();
 	});
 });
 

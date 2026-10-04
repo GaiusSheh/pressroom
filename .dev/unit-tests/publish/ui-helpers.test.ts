@@ -4,6 +4,7 @@ import { ManifestError } from '../../../src/core/manifest/manifest';
 import { PublishConflictError } from '../../../src/core/publish';
 import { isValidDir, isValidName, joinSitePath } from '../../../src/core/site-path';
 import { setLanguage } from '../../../src/i18n';
+import { commitMessage } from '../../../src/ui/commit-message';
 import { describeError } from '../../../src/ui/errors';
 
 beforeAll(() => setLanguage('zh'));
@@ -22,6 +23,19 @@ describe('站内路径', () => {
 	});
 	it.each([['', true], ['/', true], ['a/b', true], ['a/../b', false], ['./a', false], ['a//b', false]])('isValidDir(%j) → %s', (d, ok) => {
 		expect(isValidDir(d)).toBe(ok);
+	});
+});
+
+describe('commitMessage', () => {
+	it('只涉及一篇：沿用单篇格式', () => {
+		expect(commitMessage({ published: ['a.md'], updated: [], unpublished: [] })).toBe('Pressroom：发布 a.md');
+		expect(commitMessage({ published: [], updated: ['a.md'], unpublished: [] })).toBe('Pressroom：更新 a.md');
+		expect(commitMessage({ published: [], updated: [], unpublished: ['a.md'] })).toBe('Pressroom：撤稿 a.md');
+	});
+	it('多篇：分段列出', () => {
+		expect(commitMessage({ published: ['a.md'], updated: ['b.md', 'c.md'], unpublished: ['d.md'] })).toBe(
+			'Pressroom：发布 a.md；更新 b.md、c.md；撤稿 d.md',
+		);
 	});
 });
 

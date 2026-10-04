@@ -1,7 +1,7 @@
 // Quartz 5 生成器适配。slug 规则直接复用 Quartz 5 所用的 @quartz-community/utils，不自行实现
 // 依据：.dev/docs/others/phase0-findings.md §0-1 ~ §0-3
 
-import { type FilePath, getFileExtension, simplifySlug, slugifyFilePath } from '@quartz-community/utils/path';
+import { type FilePath, getFileExtension, simplifySlug, slugifyFilePath, splitAnchor } from '@quartz-community/utils/path';
 import type { Conflict, Generator, LinkStrategy, LinkTarget, SiteConfigResult, SlugOwner, YamlParser } from './types';
 
 /** Quartz 配置文件在站点仓库中的路径 */
@@ -64,6 +64,15 @@ export function formatLink({ from, to, anchor, text, strategy }: LinkTarget): st
 	const path = strategy === 'relative' ? relativePath(slugOf(from), targetSlug) : targetSlug;
 	const hash = anchor ? `#${anchor}` : '';
 	return `[${escapeLinkText(text)}](<${path}${hash}>)`;
+}
+
+/**
+ * 指向其他站点页面的链接（完整网址）。锚点按 Quartz 规则（github-slugger）转换后拼接，
+ * 因为对方站点的标题 id 由 Quartz 生成，浏览器不会再做转换
+ */
+export function externalLink(pageUrl: string, text: string, anchor?: string): string {
+	const hash = anchor ? splitAnchor(`x#${anchor}`)[1] : '';
+	return `[${escapeLinkText(text)}](<${pageUrl}${hash}>)`;
 }
 
 const LINK_STRATEGIES: LinkStrategy[] = ['shortest', 'absolute', 'relative'];

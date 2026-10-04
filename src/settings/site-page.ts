@@ -9,11 +9,14 @@ import {
 	checkRepo,
 	checkSiteName,
 	checkSiteUrl,
+	findRepoBranchClash,
 } from './validate';
 
 export interface SitePageHost {
 	/** 其他站点的名称（重名检查） */
 	otherNames(site: SiteConfig): string[];
+	/** 全部站点（仓库 + 分支重复检查） */
+	allSites(): SiteConfig[];
 	save(): Promise<void>;
 	/** 确认后移除站点；用户取消返回 false */
 	remove(site: SiteConfig): Promise<boolean>;
@@ -40,13 +43,26 @@ export class SitePage extends SettingPage {
 	display(): void {
 		const { containerEl: el, site } = this;
 		el.empty();
+		this.validators = [];
+		this.committers = [];
 
 		this.text(el, 'settings.site.name', 'settings.site.name.desc', site.name, '', (v) =>
 			checkSiteName(v, this.host.otherNames(site)),
 			(v) => (site.name = v),
 		);
-		this.text(el, 'settings.site.repo', 'settings.site.repo.desc', site.repo, 'owner/repo', checkRepo, (v) => (site.repo = v));
-		this.text(el, 'settings.site.branch', 'settings.site.branch.desc', site.branch, 'main', checkBranch, (v) => (site.branch = v));
+		// 仓库 + 分支不能与其他站点相同（同一分支的站点会共用 manifest）
+		const noClash = (candidate: { repo: string; branch: string }): Checked | undefined => {
+			const clash = findRepoBranchClash({ id: site.id, ...candidate }, this.host.allSites());
+			return clash ? { error: 'error.repoBranchTaken', vars: { name: clash.name } } : undefined;
+		};
+		this.text(el, 'settings.site.repo', 'settings.site.repo.desc', site.repo, 'owner/repo', (raw) => {
+			const r = checkRepo(raw);
+			return r.error ? r : (noClash({ repo: r.value, branch: site.branch }) ?? r);
+		}, (v) => (site.repo = v));
+		this.text(el, 'settings.site.branch', 'settings.site.branch.desc', site.branch, 'main', (raw) => {
+			const r = checkBranch(raw);
+			return r.error ? r : (noClash({ repo: site.repo, branch: r.value }) ?? r);
+		}, (v) => (site.branch = v));
 		this.text(
 			el,
 			'settings.site.contentDir',
@@ -129,11 +145,17 @@ export class SitePage extends SettingPage {
 	}
 
 	hide(): void {
+		// 离开子页面时提交正在编辑的字段（输入框被移除时不一定触发 blur）
+		for (const commit of this.committers) void commit();
 		super.hide();
 		this.host.onLeave();
 	}
 
-	/** 带校验的文本框：校验失败时在说明下方显示错误且不保存 */
+	/**
+	 * 带校验的文本框：打字时只实时显示校验结果；离开输入框或按回车时才保存（合法时）。
+	 * 不在每次按键时保存：否则打到一半的合法值（如分支 main 打到 mai）会被存下，
+	 * 而最终值不合法时不保存，输入框显示的与实际保存的不一致；也避免保存未上屏的拼音。
+	 */
 	private text(
 		el: HTMLElement,
 		nameKey: MessageKey,
@@ -145,20 +167,43 @@ export class SitePage extends SettingPage {
 	) {
 		const setting = new Setting(el).setName(t(nameKey)).setDesc(t(descKey));
 		const errorEl = setting.descEl.createDiv({ cls: 'pressroom-field-error' });
-		const show = (result: Checked) => errorEl.setText(result.error ? t(result.error) : '');
-		setting.addText((text) =>
-			text
-				.setPlaceholder(placeholder)
+		const show = (result: Checked) => errorEl.setText(result.error ? t(result.error, result.vars) : '');
+		let current = value;
+		let saved = value;
+		const commit = async () => {
+			const result = check(current);
+			show(result);
+			if (result.value === undefined || result.value === saved) return;
+			apply(result.value);
+			saved = result.value;
+			await this.host.save();
+			// 字段之间有联动校验（仓库 + 分支不能与其他站点重复）：保存后重新校验所有字段
+			this.revalidate();
+		};
+		setting.addText((text) => {
+			text.setPlaceholder(placeholder)
 				.setValue(value)
-				.onChange(async (raw) => {
-					const result = check(raw);
-					show(result);
-					if (result.value === undefined) return;
-					apply(result.value);
-					await this.host.save();
-				}),
-		);
+				.onChange((raw) => {
+					current = raw;
+					show(check(raw));
+				});
+			text.inputEl.addEventListener('blur', () => void commit());
+			text.inputEl.addEventListener('keydown', (e) => {
+				// 输入法组字中的回车用于选词，不提交
+				if (e.key === 'Enter' && !e.isComposing) void commit();
+			});
+		});
+		this.validators.push(() => show(check(current)));
+		this.committers.push(commit);
 		// 已保存的值不合法（或必填为空）时，打开页面就提示
 		show(check(value));
+	}
+
+	/** 各文本框的重新校验 / 提交函数（display 时重建） */
+	private validators: (() => void)[] = [];
+	private committers: (() => Promise<void>)[] = [];
+
+	private revalidate() {
+		for (const v of this.validators) v();
 	}
 }

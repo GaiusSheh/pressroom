@@ -27,11 +27,23 @@ export interface ParsedNote {
 	refs: NoteRef[];
 }
 
+/** 被嵌入的内容：整篇笔记 + 要展开的正文范围（[start, end)） */
+export interface EmbedSource {
+	note: ParsedNote;
+	start: number;
+	end: number;
+}
+
 /** core 需要的 vault 能力，由平台层实现 */
 export interface VaultAccess {
 	/** 解析链接目标为 vault 文件路径；无法解析返回 undefined */
 	resolve(target: string, fromPath: string): string | undefined;
 	readBinary(path: string): Promise<Uint8Array>;
+	/**
+	 * 读取被嵌入的笔记与要展开的范围：无 subpath 为整篇正文（不含 frontmatter），
+	 * subpath 为标题或 ^块 id（不含 #）时为对应段落；笔记或子路径不存在返回 undefined
+	 */
+	loadEmbed(vaultPath: string, subpath?: string): Promise<EmbedSource | undefined>;
 }
 
 /** 路径是否位于排除文件夹内（文件夹本身或其子路径；Private2/ 不算 Private/） */

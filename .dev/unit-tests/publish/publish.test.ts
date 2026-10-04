@@ -3,38 +3,22 @@ import { parse, stringify } from 'yaml';
 import { GitHubBackend } from '../../../src/core/backend/github';
 import { utf8Decode, utf8Encode } from '../../../src/core/hash';
 import { MANIFEST_PATH, parseManifest } from '../../../src/core/manifest/manifest';
-import type { VaultAccess } from '../../../src/core/note';
 import {
 	type PublishContext,
 	PublishConflictError,
 	deletedSources,
 	loadSnapshot,
 	noteStatus,
+	prepareNote,
 	publishNote,
-	readAttachments,
 	unpublishNote,
 } from '../../../src/core/publish';
 import { newSite } from '../../../src/settings/settings';
 import { FakeGitHub } from '../backend/fake-github';
-import { makeNote } from '../transform/make-note';
+import { fakeVault } from '../transform/fake-vault';
 
 const PNG = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
 const CONFIG = 'plugins:\n  - source: "@quartz-community/crawl-links"\n    options:\n      markdownLinkResolution: shortest\n';
-
-/** 假 vault：笔记文本 + 附件字节 */
-function fakeVault(notes: Record<string, string>, binaries: Record<string, Uint8Array> = {}) {
-	const all = [...Object.keys(notes), ...Object.keys(binaries)];
-	const vault: VaultAccess = {
-		resolve: (target) =>
-			all.find((f) => f === target || f === `${target}.md` || f.endsWith(`/${target}`) || f.endsWith(`/${target}.md`)),
-		readBinary: async (p) => {
-			const b = binaries[p];
-			if (!b) throw new Error(`fake vault: 没有 ${p}`);
-			return b;
-		},
-	};
-	return { vault, note: (p: string) => makeNote(p, notes[p]!) };
-}
 
 async function setup(notes: Record<string, string>, binaries: Record<string, Uint8Array> = {}, repoFiles: Record<string, string | Uint8Array> = {}) {
 	const fake = await FakeGitHub.create({ 'quartz.config.yaml': CONFIG, ...repoFiles });
@@ -217,7 +201,7 @@ describe('并发与状态', () => {
 		const t = await setup(notes);
 		const status = async (p: string) => {
 			const note = t.note(p);
-			return noteStatus(t.ctx, note, await loadSnapshot(t.ctx), await readAttachments(t.ctx, note));
+			return noteStatus(t.ctx, await prepareNote(t.ctx, note), await loadSnapshot(t.ctx));
 		};
 		expect((await status('b.md')).kind).toBe('unpublished');
 		await publishNote(t.ctx, t.note('a.md'), { sitePath: 'a.md', message: msg });

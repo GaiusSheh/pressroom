@@ -2,7 +2,9 @@
 
 import type { MessageKey } from '../i18n';
 
-export type Checked = { value: string; error?: undefined } | { value?: undefined; error: MessageKey };
+export type Checked =
+	| { value: string; error?: undefined }
+	| { value?: undefined; error: MessageKey; vars?: Record<string, string | number> };
 
 export function checkRequired(raw: string): Checked {
 	const value = raw.trim();
@@ -50,6 +52,20 @@ export function checkSiteName(raw: string, otherNames: string[]): Checked {
 	return otherNames.some((n) => n.trim().toLowerCase() === lower)
 		? { error: 'error.nameDuplicate' }
 		: required;
+}
+
+/**
+ * 每个站点必须有独立的「仓库 + 分支」：manifest 存在分支根目录，同一分支的两个站点会共用发布记录、互相误判
+ * （2026-10-04 用户决定：禁止同仓库同分支，同仓库不同分支允许）。仓库名比较忽略大小写（GitHub 不区分）
+ */
+export function findRepoBranchClash<T extends { id: string; name: string; repo: string; branch: string }>(
+	site: { id: string; repo: string; branch: string },
+	sites: T[],
+): T | undefined {
+	const repo = site.repo.trim().toLowerCase();
+	const branch = site.branch.trim();
+	if (!repo || !branch) return undefined;
+	return sites.find((s) => s.id !== site.id && s.repo.trim().toLowerCase() === repo && s.branch.trim() === branch);
 }
 
 /** 多行或逗号分隔的列表 → 去空白、去空项、去重 */

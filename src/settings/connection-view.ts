@@ -5,7 +5,8 @@ import type { BackendError } from '../core/backend/types';
 import type { SiteConfig } from '../core/types';
 import { t } from '../i18n';
 
-export type Level = 'ok' | 'warn' | 'error';
+/** info：中性说明（既不是检查通过也不是问题，如「写入权限无法检查」） */
+export type Level = 'ok' | 'info' | 'warn' | 'error';
 export interface Line {
 	level: Level;
 	text: string;
@@ -71,6 +72,6 @@ export function describeConnection(result: ConnectionResult, site: SiteConfig): 
 		}
 	}
 	// 只读检查无法验证写权限（fine-grained token 的权限不在响应中体现）
-	lines.push({ level: 'ok', text: t('conn.writeNote') });
+	lines.push({ level: 'info', text: t('conn.writeNote') });
 	return lines;
 }

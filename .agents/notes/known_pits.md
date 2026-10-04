@@ -31,6 +31,20 @@
 - **根因**：GitHub API 对 `git/ref/heads/*`、`contents/*`、`git/trees/*` 返回 `Cache-Control: private, max-age=60`；Obsidian 的 `requestUrl` 走 Chromium 网络层，遵守该缓存。
 - **解法**：读取会变化的资源（仓库信息、分支指向、按分支读文件）时请求头加 `Cache-Control: no-cache`（`github.ts` 的 `request(..., { fresh: true })`）；按 sha 读取的 commit / tree / blob 内容不可变，保留缓存。新增读取「会变的东西」的接口时必须带 `fresh`。
 
+## metadataCache 的 displayText 不能用来判断「用户写了别名」
+
+- `[[笔记#标题]]` 的 `displayText` 是 Obsidian 自动生成的「笔记 > 标题」，与 `link`（`笔记#标题`）不同，但用户并没有写别名。
+- 判断方式：维基链接看原文是否含 `|`；Markdown 链接看方括号内是否有文字（`platform/vault.ts` 的 `isCustomDisplay`）。
+
+## 同一仓库同一分支配两个站点会共用 manifest
+
+- manifest 固定在分支根目录 `.pressroom/manifest.json`，两个站点共用后互相把对方的发布当成自己的（Phase 3 GUI 测试发现）。现已禁止（设置页校验 + 操作入口跳过）；测试第二个站点用测试仓库的 `site2` 分支（`sandbox-reset.mjs` 会创建 / 复位）。
+
+## GUI 测试 agent 的注意事项
+
+- 子 agent 的上下文会很长（一次完整 GUI 测试约 30 万 token），续跑旧 agent 容易撞会话额度上限；新一轮测试新开 agent，把环境、清单和工具坑一次写清楚。
+- 耗时数秒的操作要有进度提示，完成提示停留足够久，否则人和测试 agent 都容易错过结果。
+
 ## Obsidian 声明式设置页（1.13）
 
 - 在声明式 `page` 子页面打开时调用 `SettingTab.update()`，子页面会变空白，并打断输入法组字（未上屏的拼音被当作文字保存）。需要在子页面里改动会影响列表的数据时，用自定义 `SettingPage` 子类，在 `hide()` 中再 `update()`。

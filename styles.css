@@ -24,6 +24,15 @@
 	color: var(--text-success);
 }
 
+.pressroom-conn-line.mod-info::before {
+	content: '·';
+	color: var(--text-muted);
+}
+
+.pressroom-conn-line.mod-info {
+	color: var(--text-muted);
+}
+
 .pressroom-conn-line.mod-warn::before {
 	content: '!';
 	color: var(--text-warning);
@@ -62,6 +71,17 @@
 	color: var(--text-warning);
 }
 
-.pressroom-notice-button {
+.pressroom-notice-buttons {
+	display: flex;
+	gap: var(--size-4-2);
 	margin-top: var(--size-4-2);
+}
+
+.pressroom-notice-extra {
+	margin-top: var(--size-4-2);
+	font-size: var(--font-ui-small);
+}
+
+.pressroom-location-unpublished {
+	margin: var(--size-4-2) 0;
 }

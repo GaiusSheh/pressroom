@@ -1,4 +1,4 @@
-import { type App, type CachedMetadata, TFile, getFrontMatterInfo, parseLinktext, parseYaml } from 'obsidian';
+import { type App, type CachedMetadata, TFile, getFrontMatterInfo, parseLinktext, parseYaml, resolveSubpath } from 'obsidian';
 import type { NoteRef, ParsedNote, VaultAccess } from '../core/note';
 
 /** 用 metadataCache 构造 ParsedNote。缓存与正文不一致（索引尚未更新）时等待一次 changed 事件后重试 */
@@ -11,6 +11,15 @@ export async function parseNote(app: App, file: TFile): Promise<ParsedNote> {
 		await waitForIndex(app, file);
 	}
 	throw new Error(`笔记 ${file.path} 的索引尚未更新（metadataCache 与正文不一致），请稍后重试`);
+}
+
+/**
+ * 用户是否显式写了显示文字：维基链接看有没有 |别名；Markdown 链接看方括号内是否有文字。
+ * 不能用「displayText !== link」判断：Obsidian 对 [[笔记#标题]] 自动生成「笔记 > 标题」作为显示文字
+ */
+function isCustomDisplay(original: string, display: string): boolean {
+	if (original.includes('[[')) return original.includes('|');
+	return display.trim() !== '';
 }
 
 /** 缓存中每条链接在正文对应位置的原文必须一致，否则返回 undefined（缓存过期） */
@@ -34,7 +43,7 @@ function tryBuild(vaultPath: string, text: string, cache: CachedMetadata): Parse
 			target: path,
 			subpath: subpath ? subpath.replace(/^#/, '') : undefined,
 			display,
-			customDisplay: display !== item.link,
+			customDisplay: isCustomDisplay(item.original, display),
 		});
 	}
 	refs.sort((a, b) => a.start - b.start);
@@ -68,6 +77,15 @@ function waitForIndex(app: App, file: TFile, timeoutMs = 3000): Promise<void> {
 	});
 }
 
+/** vault 中链接或嵌入到 target 的笔记（metadataCache.resolvedLinks 反查；嵌入也计入） */
+export function backlinkSources(app: App, target: string): string[] {
+	const out: string[] = [];
+	for (const [source, targets] of Object.entries(app.metadataCache.resolvedLinks)) {
+		if (targets[target]) out.push(source);
+	}
+	return out;
+}
+
 export function obsidianVault(app: App): VaultAccess {
 	return {
 		resolve: (target, fromPath) => app.metadataCache.getFirstLinkpathDest(target, fromPath)?.path,
@@ -75,6 +93,17 @@ export function obsidianVault(app: App): VaultAccess {
 			const file = app.vault.getAbstractFileByPath(path);
 			if (!(file instanceof TFile)) throw new Error(`附件不存在：${path}`);
 			return new Uint8Array(await app.vault.readBinary(file));
+		},
+		loadEmbed: async (path, subpath) => {
+			const file = app.vault.getAbstractFileByPath(path);
+			if (!(file instanceof TFile)) return undefined;
+			const note = await parseNote(app, file);
+			if (!subpath) return { note, start: note.frontmatter?.bodyStart ?? 0, end: note.text.length };
+			const cache = app.metadataCache.getFileCache(file);
+			// resolveSubpath 要求带 #：#标题 或 #^块
+			const r = cache ? resolveSubpath(cache, `#${subpath}`) : null;
+			if (!r) return undefined;
+			return { note, start: r.start.offset, end: r.end?.offset ?? note.text.length };
 		},
 	};
 }

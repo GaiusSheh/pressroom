@@ -8,10 +8,22 @@ import { isValidDir, isValidName, joinSitePath } from '../core/site-path';
 import type { SiteConfig } from '../core/types';
 import { t } from '../i18n';
 
-/** 首次发布位置弹窗（需求 §5.3，手动模式）。确认返回站内路径，取消返回 undefined */
-export function chooseLocation(app: App, site: SiteConfig, snap: SiteSnapshot, vaultPath: string): Promise<string | undefined> {
-	return new Promise((resolve) => new LocationModal(app, site, snap, vaultPath, resolve).open());
+/**
+ * 首次发布位置弹窗（需求 §5.3，手动模式）。确认返回站内路径，取消返回 undefined。
+ * unpublishedLinks：本篇中指向「未在本站发布」笔记的显示名，非空时列出并说明之后会提醒更新（需求 §7 2026-10-04 修订）
+ */
+export function chooseLocation(
+	app: App,
+	site: SiteConfig,
+	snap: SiteSnapshot,
+	vaultPath: string,
+	unpublishedLinks: string[] = [],
+): Promise<string | undefined> {
+	return new Promise((resolve) => new LocationModal(app, site, snap, vaultPath, unpublishedLinks, resolve).open());
 }
+
+/** 列表最多显示的名称数，其余以「等 N 篇」概括 */
+const MAX_LISTED = 5;
 
 class LocationModal extends Modal {
 	private dir = '';
@@ -23,6 +35,7 @@ class LocationModal extends Modal {
 		private readonly site: SiteConfig,
 		private readonly snap: SiteSnapshot,
 		private readonly vaultPath: string,
+		private readonly unpublishedLinks: string[],
 		private readonly resolve: (sitePath: string | undefined) => void,
 	) {
 		super(app);
@@ -75,7 +88,14 @@ class LocationModal extends Modal {
 		const preview = new Setting(contentEl).setName(t('location.preview'));
 		this.previewEl = preview.descEl;
 		this.messageEl = contentEl.createDiv({ cls: 'pressroom-location-messages' });
-		contentEl.createEl('p', { text: t('location.plainLinks'), cls: 'setting-item-description' });
+		if (this.unpublishedLinks.length > 0) {
+			const shown = this.unpublishedLinks.slice(0, MAX_LISTED);
+			const rest = this.unpublishedLinks.length - shown.length;
+			const names = shown.join(t('common.listSep')) + (rest > 0 ? t('location.andMore', { n: rest }) : '');
+			const box = contentEl.createDiv({ cls: 'pressroom-location-unpublished setting-item-description' });
+			box.createEl('p', { text: t('location.unpublishedLinks', { names }) });
+			box.createEl('p', { text: t('location.unpublishedHint') });
+		}
 
 		new Setting(contentEl)
 			.addButton((b) => b.setButtonText(t('common.cancel')).onClick(() => this.close()))
