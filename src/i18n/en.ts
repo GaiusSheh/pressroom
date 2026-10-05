@@ -125,8 +125,9 @@ export const en = {
 	'unpublish.confirm': 'Unpublish',
 
 	'location.title': 'Publish to {site}',
-	'location.useVault': 'Use the vault folder and name',
-	'location.useVault.desc': 'Fills in the folder and name from the vault. You can still edit them.',
+	'location.useVault': 'Location in the vault',
+	'location.useVault.desc': 'Fills the two fields below with the folder and name from the vault. You can still edit them afterwards.',
+	'location.useVault.button': 'Fill in vault location',
 	'location.dir': 'Folder on the site',
 	'location.dir.placeholder': '(site root)',
 	'location.name': 'Name on the site',

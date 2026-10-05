@@ -117,8 +117,9 @@ export const zh: Messages = {
 	'unpublish.confirm': '撤稿',
 
 	'location.title': '发布到「{site}」',
-	'location.useVault': '按 Vault 内目录发布',
-	'location.useVault.desc': '填入笔记在 vault 中的目录与文件名，之后仍可修改。',
+	'location.useVault': 'Vault 中的位置',
+	'location.useVault.desc': '把笔记在 vault 中的目录与文件名填入下面两栏，填入后仍可修改。',
+	'location.useVault.button': '填入 vault 位置',
 	'location.dir': '站内目录',
 	'location.dir.placeholder': '（站点根目录）',
 	'location.name': '站内名称',

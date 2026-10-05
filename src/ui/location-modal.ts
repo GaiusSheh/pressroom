@@ -86,10 +86,10 @@ export class LocationBlock {
 		new Setting(el)
 			.setName(t('location.useVault'))
 			.setDesc(t('location.useVault.desc'))
-			.addToggle((tg) =>
-				tg.setValue(false).onChange((on) => {
-					// 手动模式下是一次性的填入快捷方式，不留记录（需求 §5.1）
-					if (!on) return;
+			// 一次性的填入快捷方式，不留记录（需求 §5.1）。用按钮而不是开关：
+			// 开关在用户随后改动目录 / 名称后仍显示为打开，容易被误解为「跟随 vault」（2026-10-05 用户决定）
+			.addButton((b) =>
+				b.setButtonText(t('location.useVault.button')).onClick(() => {
 					this.dir = vaultDir;
 					this.name = stem(vaultPath);
 					dirText?.setValue(this.dir);
@@ -118,7 +118,8 @@ export class LocationBlock {
 			});
 		});
 
-		const preview = new Setting(el).setName(t('location.preview'));
+		// 网址可能很长（中文百分号编码后没有断行点），允许任意位置换行，避免被截断
+		const preview = new Setting(el).setName(t('location.preview')).setClass('pressroom-location-preview');
 		this.previewEl = preview.descEl;
 		this.messageEl = el.createDiv({ cls: 'pressroom-location-messages' });
 		if (unpublishedLinks.length > 0) {
@@ -200,7 +201,7 @@ class LocationModal extends Modal {
 		const { contentEl } = this;
 		this.setTitle(this.texts.title);
 		this.block.render(contentEl);
-		if (this.texts.note) contentEl.createDiv({ text: this.texts.note, cls: 'pressroom-conn-line mod-warn' });
+		if (this.texts.note) this.noteEl = contentEl.createDiv({ text: this.texts.note, cls: 'pressroom-conn-line mod-warn pressroom-location-note' });
 		new Setting(contentEl)
 			.addButton((b) => b.setButtonText(t('common.cancel')).onClick(() => this.close()))
 			.addButton((b) => {
@@ -222,8 +223,16 @@ class LocationModal extends Modal {
 		if (!this.done) this.resolve(undefined);
 	}
 
+	private noteEl?: HTMLElement;
+
+	/**
+	 * 移动时位置与当前相同（exclude 即当前站内路径）：没有可移动的，禁用按钮并隐藏「旧网址将失效」的提示
+	 * （GUI 测试反馈）
+	 */
 	private refresh() {
-		if (this.publishButton) this.publishButton.disabled = !this.block.valid();
+		const unchanged = this.input.exclude !== undefined && this.block.sitePath() === this.input.exclude;
+		if (this.publishButton) this.publishButton.disabled = unchanged || !this.block.valid();
+		this.noteEl?.toggle(!unchanged);
 	}
 }
 
