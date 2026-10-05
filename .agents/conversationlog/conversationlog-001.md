@@ -352,12 +352,60 @@
 
 ---
 
+## Session: 2026-10-05 位置弹窗改进与 Phase 6 发布准备
+
+**对话元数据**:
+- 时间: 2026-10-05
+- 关键词: `填入 vault 位置`, `Phase 6`, `displayUrl`, `快照缓存`, `README`, `release workflow`, `社区插件`
+- 工作目录: `C:\Users\Shi_Y\OneDrive\Codes\my-tools\Pressroom`
+- 项目规则入口: `.agents/AGENTS.md`
+- 参与 agent:
+  - Claude Code (env: windows-native)
+    - Session ID: `38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 原始记录: `~/.claude/projects/c--Users-Shi-Y-OneDrive-Codes-my-tools-Pressroom/38707732-41c0-4ac4-85ce-53f3e848581e.jsonl`
+    - 恢复命令: `claude --resume 38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 备注：GUI 检查由派生子 agent 通过 windows-mcp 执行（windows-mcp 断连一次，重连后重跑）
+
+**快速恢复对话**：同环境用上方恢复命令；跨环境走 `skills/handover` 软接力，不 resume。
+
+### 核心技术决策
+
+#### 1. 「按 Vault 内目录发布」开关 → 「填入 vault 位置」按钮（用户提问引出）
+- 用户问：勾上后又改目录，勾会取消吗？——不会，开关只在打开时填一次，之后仍显示打开，易被误解为「跟随 vault」；用户选改成按钮
+- 顺带（GUI 反馈）：移动弹窗位置未改动时禁用「移动」并隐藏提示；长网址换行；提示间距
+
+#### 2. Phase 6 范围（用户决定）
+- 不做「导入已有内容」（用户在另一边迁移）；不接入作者站点；发布只做到「准备好」，建仓库 / 推送 / tag / 社区 PR 由用户操作
+- 版本 `1.0.0`；Release 为草稿；README 中英双语；网址显示中文与读取提速纳入
+- 本机用户名与 OneDrive 路径出现在开发文档中：用户判断不敏感，保持现状
+
+### 技术调整/突破
+
+**问题 1**：计划中的「跨站按需读取」实测无收益。
+**最终方案**：[✓] 读取一个站点约 1 秒（4 次串行请求）；真正的浪费是 30 秒缓存过期太快、选站后发布 / 撤稿又强制重读 → 缓存 5 分钟（自身写入、改名后失效）+ 发布 / 撤稿复用缓存；写入始终在 commit 中按最新 head 计算。
+
+**问题 2**：`decodeURI` 会把 `%25` 还原为 `%`。
+**最终方案**：[✓] slug 本身不含 `%`，只用于显示无影响；测试改为断言 slug 不含 `%25`。
+
+### 重要代码与文档创建
+
+- `src/core/generator/quartz.ts`：`displayUrl`；`src/ui/location-modal.ts`：填入按钮、移动弹窗细节
+- `README.md`、`README.zh.md`、`.github/workflows/release.yml`、`.dev/docs/others/release-checklist.md`、`.dev/tests/phase6/snapshot-timing.mjs`
+- 计划：`.dev/plans/implemented/phase6-detailed-plan.md`
+
+### 下一步
+
+- 用户按 `release-checklist.md` 第三节建仓库、推送、打 tag `1.0.0`、检查草稿 Release、提交社区 PR
+- 测试结束后撤销测试 token；按审核意见修改
+
+---
+
 ## 统计信息
 
-- **记录的主题 Session 数量**：6 个
+- **记录的主题 Session 数量**：7 个
 - **关联的 agent 会话数量**：1 个（含多个派生的 GUI 测试子 agent）
 - **覆盖时间**：2026-10-03 ~ 2026-10-05
-- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离、Phase 4 多站点与目录模式、Phase 5 管理面板
+- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离、Phase 4 多站点与目录模式、Phase 5 管理面板、Phase 6 体验收尾与发布准备
 
 ---
 

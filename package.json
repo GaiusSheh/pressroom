@@ -1,6 +1,6 @@
 {
 	"name": "pressroom",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "多站点、逐篇、零 frontmatter 的 Obsidian 发布插件（Quartz 5 + GitHub）",
 	"main": "main.js",
 	"type": "module",

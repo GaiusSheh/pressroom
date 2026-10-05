@@ -4,7 +4,7 @@ import type { Messages } from './en';
 export const zh: Messages = {
 	'plugin.name': 'Pressroom',
 
-	'settings.global.heading': '通用',
+	'settings.global.heading': '发布',
 	'settings.token.name': 'GitHub token',
 	'settings.token.desc':
 		'保存在 Obsidian 密钥库中，不写入插件数据。使用 fine-grained token，只需对站点仓库授予「Contents: Read and write」权限。',
@@ -47,7 +47,7 @@ export const zh: Messages = {
 	'settings.site.test.button': '测试',
 	'settings.site.test.running': '正在测试…',
 
-	'conn.noToken': '还没有 GitHub token，请先在「通用」中设置。',
+	'conn.noToken': '还没有 GitHub token，请先在 Pressroom 设置的「发布」中设置。',
 	'conn.incomplete': '请先填写仓库和分支。',
 	'conn.auth': 'token 无效或已过期。',
 	'conn.repoNotFound': '找不到仓库 {repo}，或 token 无权访问它。',

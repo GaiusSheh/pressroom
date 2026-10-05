@@ -22,6 +22,18 @@ export function urlOf(siteUrl: string, path: string): string {
 	return `${siteUrl.replace(/\/+$/, '')}/${tail}`;
 }
 
+/**
+ * 显示用网址：把 urlOf 的百分号编码还原为中文等原字符（解码失败时原样返回）。
+ * 只用于界面显示；复制到剪贴板与打开网页仍用编码形式（中文网址在部分聊天软件中会断开）
+ */
+export function displayUrl(url: string): string {
+	try {
+		return decodeURI(url);
+	} catch {
+		return url;
+	}
+}
+
 export function findConflicts(candidate: string, owners: SlugOwner[], exclude?: string): Conflict[] {
 	const target = slugOf(candidate);
 	const excludeSlug = exclude === undefined ? undefined : slugOf(exclude);

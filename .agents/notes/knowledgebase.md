@@ -9,6 +9,10 @@
 | `.dev/tests/phase0/quartz/` | 在本地 Quartz 测试站实测三种链接解析策略与 aliases |
 | `.dev/tests/phase0/github/` | Git Data API 探索脚本；`.env.local`（gitignore）存测试仓库名与 token |
 | `.dev/changelog/` | 开发日志 |
+| `.dev/docs/others/release-checklist.md` | 社区插件提交自查、`community-plugins.json` 条目、PR 草稿与用户发布步骤 |
+| `.github/workflows/release.yml` | 推送版本 tag 时检查版本、lint / 测试 / 构建并创建草稿 Release |
+| `.dev/tests/phase6/snapshot-timing.mjs` | 测量读取一个站点快照的各次请求耗时 |
+| `README.md`、`README.zh.md` | 用户文档（英文 / 中文，内容一致） |
 | `.agents/conversationlog/` | 对话日志（Session ID 与决策要点） |
 | `src/main.ts` | 插件入口：语言、设置加载、设置页注册、`getToken()` |
 | `src/core/` | 纯逻辑，禁止 import `obsidian`：`generator/`（Quartz 适配、`ignore.ts` 忽略规则）、`backend/`（GitHub 客户端）、`manifest/`、`note.ts`（ParsedNote / VaultAccess）、`transform/`（内容转换）、`attachments.ts`（附件路径分配）、`publish.ts`（发布 / 更新 / 撤稿 / 状态）、`site-path.ts`、`connection.ts`（测试连接）、`hash.ts`、`types.ts` |

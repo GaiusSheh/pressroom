@@ -2,7 +2,7 @@
 export const en = {
 	'plugin.name': 'Pressroom',
 
-	'settings.global.heading': 'General',
+	'settings.global.heading': 'Publishing',
 	'settings.token.name': 'GitHub token',
 	'settings.token.desc':
 		'Stored in Obsidian\'s secret storage, never in plugin data. A fine-grained token with "Contents: Read and write" on your site repositories is enough.',
@@ -53,7 +53,7 @@ export const en = {
 	'settings.site.test.button': 'Test',
 	'settings.site.test.running': 'Testing…',
 
-	'conn.noToken': 'No GitHub token yet. Set one under General first.',
+	'conn.noToken': 'No GitHub token yet. Set one under Publishing in Pressroom settings first.',
 	'conn.incomplete': 'Fill in the repository and branch first.',
 	'conn.auth': 'The token is invalid or has expired.',
 	'conn.repoNotFound': 'Repository {repo} was not found, or the token cannot access it.',

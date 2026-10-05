@@ -2,11 +2,11 @@
 
 ## 项目状态概览
 **目标**: 免费、开源的 Obsidian 发布插件——多站点、逐篇发布、零 frontmatter、带管理面板，替换 Enveloppe  
-**当前状态**: Phase 5 管理面板已验收通过；需求 v1（`.dev/docs/requirements/v0/requirements.md`）  
+**当前状态**: Phase 0–6 全部验收通过，版本 1.0.0 待用户公开发布；需求 v1（`.dev/docs/requirements/v0/requirements.md`）  
 **项目性质**: Obsidian 社区插件（仅桌面端），作者自用 + 开源发布  
 **技术约束**: 仅 Quartz 5 + GitHub；不修改笔记与 frontmatter；站点之间不得产生可追溯关联；仓库内容必须脱敏（见 `.agents/AGENTS.md`）  
 **分支架构**: 标准单仓库，主分支开发  
-**下一阶段**: Phase 6 迁移与发布（待编写详细计划）
+**下一阶段**: 公开发布与社区审核（用户操作，见 `.dev/docs/others/release-checklist.md`）
 
 ## 技术架构
 - **语言**: TypeScript，esbuild 打包，基于官方 obsidian-sample-plugin 工程结构
@@ -22,13 +22,6 @@
 - **架构特点**: 纯逻辑与 Obsidian/网络层分离，核心模块不依赖 `obsidian` 包，可直接单元测试
 
 ## 开发计划
-
-### [ ] Phase 6: 迁移与发布 (未来计划)
-**核心目标**: 作者站点从 Enveloppe 迁移，插件公开发布
-- 「导入已有内容」：按路径匹配仓库现有文件与 vault 笔记，生成 manifest
-- ~~挪动后旧链接处理（依 Phase 0 aliases 验证结论实现或放弃）~~ → Phase 0 已确认 aliases 可用：挪动时写入 aliases（实现位置随 Phase 4/5 的挪动功能），此处只保留迁移时的旧链接核对
-- README、LICENSE、发布流程（GitHub Release），提交 Obsidian 社区插件审核
-- 接入作者自己的站点（站点信息只存本机设置，不进仓库）
 
 ## 风险管控
 
@@ -165,3 +158,18 @@
 **技术调整/发现/突破**:
 - **一键重排**: ~~复用原 blob~~ **[!] 写 aliases 必改内容** → [✓] 只改 frontmatter 的 aliases，relative 策略不提供（用户决定）
 - **aliases 顺序**: **[!] manifest 读回已排序，挪动后误判有修改（Phase 4 遗留）** → [✓] 一律按码点排序
+
+### [✓] Phase 6: 体验收尾与发布准备 (已完成)
+**详细计划**: `.dev/plans/implemented/phase6-detailed-plan.md`
+**完成时间**: 2026-10-05
+**技术成果**: 网址显示中文、站点读取提速、中英双语 README、发布流程与社区审核材料就绪（版本 1.0.0）
+
+- [✓] **网址显示中文**: `displayUrl` 用于显示，复制与打开仍为编码形式
+- [✓] **读取提速**: 缓存 5 分钟 + 发布 / 撤稿复用缓存
+- [✓] **README**: `README.md`（英文）+ `README.zh.md`（中文）
+- [✓] **发布准备**: `release.yml`（tag → 检查版本 → lint / 测试 / 构建 → 草稿 Release）；`release-checklist.md`
+- [✓] **验收确认**: 人类验收通过（用户实测中文网址）
+
+**技术调整/发现/突破**:
+- **范围**: ~~导入已有内容~~、~~接入作者站点~~ → 用户自行处理；~~提交审核~~ → 发布动作由用户执行（用户决定）
+- **读取提速**: ~~跨站按需读取~~ **[!] 实测无收益** → [✓] 放宽缓存 + 复用缓存

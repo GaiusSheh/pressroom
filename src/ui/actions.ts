@@ -6,7 +6,7 @@ import type PressroomPlugin from '../main';
 import { GitHubBackend } from '../core/backend/github';
 import { publishedBacklinks, unpublishedLinkTargets } from '../core/backlinks';
 import { scanCompanions } from '../core/companions';
-import { findConflicts, urlOf } from '../core/generator/quartz';
+import { displayUrl, findConflicts, urlOf } from '../core/generator/quartz';
 import type { NoteRecord } from '../core/manifest/manifest';
 import type { BatchKind, PanelStatus } from '../core/panel';
 import { isExcluded, stem } from '../core/note';
@@ -44,8 +44,12 @@ import { RenameQueue } from './renames';
 import { chooseCompanions } from './companions-modal';
 import { type SiteItem, pickSite } from './site-picker';
 
-/** 站点快照缓存：右键菜单显示状态时复用，减少请求；发布动作本身总是基于最新 head 重新计算 */
-const SNAPSHOT_TTL_MS = 30_000;
+/**
+ * 站点快照缓存：右键菜单的状态、弹窗中的冲突提示等复用，减少请求（读一个站点约 1 秒，4 次串行请求）。
+ * 本插件的每次写入、记录到改名后立即失效；发布 / 撤稿本身总在 commit 回调中基于最新 head 重新计算，
+ * 缓存只影响显示（其他设备的改动最多延迟到缓存过期才显示）。Phase 6-2 由 30 秒放宽到 5 分钟
+ */
+const SNAPSHOT_TTL_MS = 5 * 60_000;
 
 export class PressroomActions {
 	private readonly cache = new Map<string, { at: number; snap: SiteSnapshot }>();
@@ -310,8 +314,9 @@ export class PressroomActions {
 		const ctx = await this.context(chosen);
 		let sitePath: string | undefined;
 		let companions: string[] = [];
-		// 最新快照：冲突检测、连带清单、别名跳转提示都基于它（读取时已按仓库同步目录模式）
-		const snap = await this.snapshot(chosen, true);
+		// 复用刚才选站点时读到的快照（冲突提示、连带清单、别名跳转提示）；实际写入在 commit 中按最新 head 重算，
+		// 首次发布与否判断稍旧也无妨：已被其他设备发布的，publishBatch 会按已有位置更新（Phase 6-2 省去一次读取）
+		const snap = await this.snapshot(chosen);
 		const firstPublish = !snap.manifest.notes.some((n) => n.vaultPath === file.path);
 		if (chosen.mode === 'follow') {
 			// 跟随 vault 站点：位置即 vault 位置，不弹位置窗口；指向本站未发布笔记的链接按双链处理（需求 §7）
@@ -547,8 +552,8 @@ export class PressroomActions {
 
 	/** 单站撤稿：确认框（反向链接默认一并更新为纯文本）→ 一次提交 */
 	private async unpublishOn(vaultPath: string, chosen: SiteConfig): Promise<void> {
-		// 反向链接：撤稿后它们的链接会失效，默认勾选一并更新（链接改为纯文本）
-		const snap = await this.snapshot(chosen, true);
+		// 反向链接：撤稿后它们的链接会失效，默认勾选一并更新（链接改为纯文本）。复用缓存快照，撤稿本身按最新 head
+		const snap = await this.snapshot(chosen);
 		const record = snap.manifest.notes.find((n) => n.vaultPath === vaultPath);
 		if (!record) {
 			new Notice(t('notice.notPublished', { site: chosen.name }));
@@ -559,7 +564,7 @@ export class PressroomActions {
 		const names = backlinks.map((f) => f.basename).join(t('common.listSep'));
 		const answer = await confirmWithOption(this.plugin.app, {
 			title: t('unpublish.title', { site: chosen.name }),
-			body: t('unpublish.body', { url }),
+			body: t('unpublish.body', { url: displayUrl(url) }),
 			confirmText: t('unpublish.confirm'),
 			cancelText: t('common.cancel'),
 			destructive: true,
@@ -618,7 +623,7 @@ export class PressroomActions {
 			t('picker.copyLink'),
 			async (url) => {
 				await navigator.clipboard.writeText(url);
-				new Notice(t('notice.linkCopied', { url }));
+				new Notice(t('notice.linkCopied', { url: displayUrl(url) }));
 			},
 			// 全部站点：多行「站点名：网址」，只含已发布的站点（需求 §4）
 			async (published) => {
@@ -876,7 +881,7 @@ export class PressroomActions {
 			if (action) f.createDiv({ text: action.text, cls: 'pressroom-notice-extra' });
 			const row = f.createDiv({ cls: 'pressroom-notice-buttons' });
 			const copy = row.createEl('button', { text: t('notice.copyLink') });
-			copy.addEventListener('click', () => void navigator.clipboard.writeText(url).then(() => new Notice(t('notice.linkCopied', { url }))));
+			copy.addEventListener('click', () => void navigator.clipboard.writeText(url).then(() => new Notice(t('notice.linkCopied', { url: displayUrl(url) }))));
 			if (action) {
 				const btn = row.createEl('button', { text: action.label, cls: 'mod-cta' });
 				btn.addEventListener('click', () => action.run());

@@ -1,0 +1,49 @@
+# 发布流程：推送版本 tag（如 1.0.0，与 manifest.json 的 version 相同、不带 v）时构建插件，
+# 并创建草稿 Release，附 main.js、manifest.json、styles.css。检查附件无误后在 GitHub 上手动发布。
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 检查 tag 与 manifest.json 版本一致
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME 与 manifest.json 的版本 $version 不一致"
+            exit 1
+          fi
+
+      - name: 类型检查、lint、单元测试与生产构建
+        run: |
+          npm run lint
+          npm test
+          npm run build
+
+      - name: 创建草稿 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --draft \
+            --generate-notes \
+            main.js manifest.json styles.css

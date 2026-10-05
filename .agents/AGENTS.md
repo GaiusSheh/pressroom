@@ -4,12 +4,12 @@
 免费开源的 Obsidian 发布插件：多站点、逐篇发布、零 frontmatter、带管理面板，目标生成器 Quartz 5、存储后端 GitHub，用于替换 Enveloppe。
 
 ## 当前状态
-- **阶段**: Phase 5 管理面板已完成（2026-10-05 验收通过）
+- **阶段**: Phase 6 体验收尾与发布准备已完成（2026-10-05 验收通过），版本 `1.0.0`，待用户公开发布
 - **已有能力**: 发布 / 更新 / 撤稿 / 取链接 / 打开网页（含「全部站点」）；手动与跟随 vault 两种目录模式及切换；改名自动写回、「已移动」与挪动（aliases 跳转）；跟随站点的连带发布；内容转换、跨站与隔离、反向链接提醒；管理面板（目录树、状态、单项操作、一键同步 / 更新 / 重排 / 清理已删除）；文件列表多选发布 / 撤稿
-- **尚未实现**: 导入已有内容、README / LICENSE、发布流程（Phase 6）
-- **下一步**: 编写 Phase 6（迁移与发布）详细计划
+- **范围外（用户决定）**: 导入已有内容（Enveloppe 迁移由用户自行完成）
+- **下一步**: 用户按 `.dev/docs/others/release-checklist.md` 建 GitHub 仓库、推送、打 tag、提交社区 PR；之后按审核意见修改（改版本用 `npm version patch`）
 - **测试**: 测试前运行 `.dev/tests/phase3/sandbox-reset.mjs` 复位测试仓库；Site 1 = main（手动），Site 2 = `site2` 分支（跟随 vault）；GUI 测试交给 windows-mcp 子 agent（每轮新开，只操作 test-vault 窗口，改名用右键重命名）
-- **待办**: `.agents/notes/deferred.md`（网址显示中文、测试 token 测完后撤销等）
+- **待办**: `.agents/notes/deferred.md`（测试结束后撤销测试 token）
 - **真相源**: 需求 `.dev/docs/requirements/v0/requirements.md`（当前为 v1）；总体计划 `.dev/plans/implementation_plan.md`；验证结论 `.dev/docs/others/phase0-findings.md`
 
 ## 关键技术决策
@@ -27,6 +27,7 @@
 - 连带发布只在跟随 vault 站点提供；手动站点未发布链接一律纯文本，靠反向链接提醒补链接（不自动更新）
 - 设置页文本字段离开输入框或按回车时才保存，不要改回每次按键保存
 - 目录模式以仓库 manifest 为准；跟随站点的站内路径 = vault 路径，发布已移动笔记即挪动（旧路径写 aliases）
+- 网址界面显示用 `displayUrl`（解码），复制与打开用编码形式；站点快照缓存 5 分钟，本插件写入 / 改名后失效，写入总按最新 head 计算
 - Pressroom 写入发布副本的 aliases 一律按码点排序（与 manifest 读回顺序一致，否则误判有修改）；一键重排只改 frontmatter 的 aliases，relative 链接策略不提供
 - vault 改名自动提交（只改源路径），未写回的改名经 `PublishContext.renames` 参与计算；manifest 可选字段 `plainLinks` 用于更新时只问新的未发布链接
 

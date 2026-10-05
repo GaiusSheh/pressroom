@@ -3,7 +3,7 @@
 
 import { App, Menu, Modal, Notice, TFile, setIcon } from 'obsidian';
 import type PressroomPlugin from '../../main';
-import { urlOf } from '../../core/generator/quartz';
+import { displayUrl, urlOf } from '../../core/generator/quartz';
 import type { NoteRecord } from '../../core/manifest/manifest';
 import { stem } from '../../core/note';
 import { type BatchKind, type PanelStatus, type TreeFolder, availableBatches, batchTargets, buildTree } from '../../core/panel';
@@ -243,7 +243,7 @@ export class PanelModal extends Modal {
 		menu.addSeparator();
 		menu.addItem((i) =>
 			i.setTitle(t('panel.copyLink')).setIcon('link').onClick(() => {
-				void navigator.clipboard.writeText(url).then(() => new Notice(t('notice.linkCopied', { url })));
+				void navigator.clipboard.writeText(url).then(() => new Notice(t('notice.linkCopied', { url: displayUrl(url) })));
 			}),
 		);
 		menu.addItem((i) => i.setTitle(t('panel.openPage')).setIcon('globe').onClick(() => window.open(url)));

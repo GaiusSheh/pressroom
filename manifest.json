@@ -1,7 +1,7 @@
 {
 	"id": "pressroom",
 	"name": "Pressroom",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"minAppVersion": "1.13.0",
 	"description": "Publish individual notes to one or more Quartz sites on GitHub, with a management panel and no frontmatter changes.",
 	"author": "GaiusSheh",

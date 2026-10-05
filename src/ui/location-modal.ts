@@ -1,6 +1,6 @@
 import { AbstractInputSuggest, App, Modal, Setting, type TextComponent } from 'obsidian';
 import { ASSETS_DIR } from '../core/attachments';
-import { findConflicts, urlOf } from '../core/generator/quartz';
+import { displayUrl, findConflicts, urlOf } from '../core/generator/quartz';
 import { matchIgnorePattern } from '../core/generator/ignore';
 import { stem } from '../core/note';
 import { type SiteSnapshot, slugOwners } from '../core/publish';
@@ -172,7 +172,7 @@ export class LocationBlock {
 
 	private refresh() {
 		const { errors, warnings } = this.check();
-		this.previewEl?.setText(errors.length ? '' : urlOf(this.input.site.siteUrl, this.sitePath()));
+		this.previewEl?.setText(errors.length ? '' : displayUrl(urlOf(this.input.site.siteUrl, this.sitePath())));
 		if (this.messageEl) {
 			this.messageEl.empty();
 			for (const e of errors) this.messageEl.createDiv({ text: e, cls: 'pressroom-conn-line mod-error' });

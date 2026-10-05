@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aliasSlugOf, slugOf, urlOf } from '../../../src/core/generator/quartz';
+import { aliasSlugOf, displayUrl, slugOf, urlOf } from '../../../src/core/generator/quartz';
 
 // Phase 0 用例表（.dev/docs/others/phase0-findings.md §0-1），由 Quartz 实际函数生成
 const cases: [string, string, string][] = [
@@ -80,5 +80,20 @@ describe('urlOf', () => {
 
 	it('编码后可还原为 slug', () => {
 		expect(decodeURI(urlOf(site, '笔记/示例 标题.md'))).toBe(`${site}/笔记/示例-标题`);
+	});
+});
+
+describe('displayUrl', () => {
+	const site = 'https://example.pages.dev';
+	it('中文还原为原字符', () => {
+		expect(displayUrl(urlOf(site, '笔记/数学/示例 标题.md'))).toBe(`${site}/笔记/数学/示例-标题`);
+	});
+	it('ASCII 网址不变；slug 中不含 % 等需要保留编码的字符', () => {
+		expect(displayUrl(`${site}/a-b`)).toBe(`${site}/a-b`);
+		expect(displayUrl(urlOf(site, '100% A&B #1.md'))).toBe(decodeURI(urlOf(site, '100% A&B #1.md')));
+		expect(urlOf(site, '100% A&B #1.md')).not.toContain('%25');
+	});
+	it('非法编码序列原样返回', () => {
+		expect(displayUrl(`${site}/%E7%AC`)).toBe(`${site}/%E7%AC`);
 	});
 });
