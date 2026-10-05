@@ -6,6 +6,7 @@
 - **2026-10-04 第三次**（`styles.css`）：追加的内容被写到了**文件开头、覆盖同长度的原有字节**，原文其余部分留在后面（文件既不是只剩追加部分、也不是正常追加），更难发现。
 - **根因**：未查明（Claude Code 的 Bash 工具 / Git Bash / OneDrive 目录之一）。
 - **解法**：**不要用 shell 重定向写文件**，追加、修改一律用 Edit / Write 工具；写完用 `git diff --numstat` 确认只有预期的增删。被覆盖时可从 `git show HEAD:<文件>` 取回原内容再用 Edit 补回。
+- Bash 工具中，heredoc 内容含较多引号 / 反引号时整条命令可能解析失败（`unexpected EOF while looking for matching '`），什么都不执行：较长的 Python 改写脚本先用 Write 写到 scratchpad 再运行。
 - 同一环境下 `cmd1 && grep ...` 有时不显示后面命令的输出；用 Grep / Read 工具核对文件内容，不要据此判断文件已损坏。`sed -i` 含引号的模式容易匹配失败，复杂替换用 Edit 工具。
 
 ## Git Bash 中 npm 安装脚本失败
@@ -45,6 +46,8 @@
 
 - 子 agent 的上下文会很长（一次完整 GUI 测试约 30 万 token），续跑旧 agent 容易撞会话额度上限；新一轮测试新开 agent，把环境、清单和工具坑一次写清楚。
 - 耗时数秒的操作要有进度提示，完成提示停留足够久，否则人和测试 agent 都容易错过结果。
+- Obsidian 文件列表中 Ctrl+单击是在新标签页打开，不是多选；多选要用 Shift+单击范围选择（Phase 5 测试 agent 用 scratchpad 中的辅助脚本按住 Shift 点击）。
+- 测试仓库没有 `quartz.config.yaml`，插件判为「未开启别名跳转」，涉及挪动的提示会说旧网址将失效；实际跳转效果用本地 Quartz 测试站（默认开启 AliasRedirects）构建验证。
 
 ## Obsidian 声明式设置页（1.13）
 

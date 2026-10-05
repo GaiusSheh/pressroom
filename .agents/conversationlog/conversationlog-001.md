@@ -302,12 +302,62 @@
 
 ---
 
+## Session: 2026-10-05 Phase 5 管理面板
+
+**对话元数据**:
+- 时间: 2026-10-05
+- 关键词: `Phase 5`, `管理面板`, `一键同步`, `一键更新`, `一键重排`, `清理已删除`, `站内移动`, `多选`, `aliases 顺序`
+- 工作目录: `C:\Users\Shi_Y\OneDrive\Codes\my-tools\Pressroom`
+- 项目规则入口: `.agents/AGENTS.md`
+- 参与 agent:
+  - Claude Code (env: windows-native)
+    - Session ID: `38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 原始记录: `~/.claude/projects/c--Users-Shi-Y-OneDrive-Codes-my-tools-Pressroom/38707732-41c0-4ac4-85ce-53f3e848581e.jsonl`
+    - 恢复命令: `claude --resume 38707732-41c0-4ac4-85ce-53f3e848581e`
+    - 备注：GUI 测试由派生的 general-purpose 子 agent 通过 windows-mcp 执行（一轮 11 步）
+
+**快速恢复对话**：同环境用上方恢复命令；跨环境走 `skills/handover` 软接力，不 resume。
+
+### 核心技术决策
+
+#### 1. 一键重排只改 aliases（用户决定 A）
+- 旧网址跳转需在新副本 frontmatter 写入 aliases，无法原样复用旧 blob → 读旧副本、只合并 aliases、正文不变（「有修改」保留）
+- relative 链接策略的站点不提供一键重排（正文相对链接换位置会失效）
+
+#### 2. 目录树只显示 manifest 记录（用户决定 A）；多选时手动站点未发布的跳过并说明（用户决定 B）
+
+### 技术调整/突破
+
+**问题 1**：挪动过、有 2 个以上 aliases 的笔记，状态被误判为「有修改」（Phase 4 遗留，写重排单元测试时发现）。
+**根因**：manifest 序列化时 aliases 排序，发布副本按写入顺序；读回 manifest 再渲染时顺序不同，blob SHA 不同。
+**最终方案**：[✓] `mergeAliases` 中 Pressroom 的 aliases 一律按码点排序；重排改写旧副本时先去掉上次的 Pressroom aliases 再合并；补回归测试。
+
+**问题 2**：测试仓库没有 Quartz 配置（插件判为未开别名跳转），同步 / 重排确认框却写「旧网址会跳转」，与完成提示矛盾（GUI 反馈）。
+**最终方案**：[✓] 确认框文案用 `{redirect}` 占位，按站点是否开启别名跳转填入。
+
+**其他**：Obsidian 文件列表 Ctrl+单击是新标签页打开，多选要用 Shift 范围选择（测试 agent 写了辅助脚本）；禁用按钮淡化、面板主体固定高度；Bash 中含复杂引号的 heredoc 两次解析失败 → 脚本写进 scratchpad 文件再运行。
+
+### 重要代码与文档创建
+
+- `src/core/`：`publish.ts`（`BatchOptions.move`、`PublishItem.moveTo`、`relocateBatch`、`RelocateUnsupportedError`）、`panel.ts`、transform `mergeAliases`
+- `src/ui/`：`panel/panel-modal.ts`；`actions.ts`（`publishOnSite`、`unpublishOnSite`、`moveOnSite`、`runBatch`、`publishMany`、`unpublishMany`、`panelStatuses`）；`location-modal.ts`（`chooseMoveLocation`）；`menu.ts`（ribbon、命令、files-menu）
+- `.dev/unit-tests/publish/panel.test.ts`；共 399 项
+- 测试 vault：`面板/` 示例（会修改 / 会移动 / 会删除）
+- 计划：`.dev/plans/implemented/phase5-detailed-plan.md`
+
+### 下一步
+
+- 编写 Phase 6（迁移与发布：导入已有内容、README、LICENSE、发布流程）详细计划
+- 全部测试结束后撤销测试 token（deferred）
+
+---
+
 ## 统计信息
 
-- **记录的主题 Session 数量**：5 个
+- **记录的主题 Session 数量**：6 个
 - **关联的 agent 会话数量**：1 个（含多个派生的 GUI 测试子 agent）
-- **覆盖时间**：2026-10-03 ~ 2026-10-04
-- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离、Phase 4 多站点与目录模式
+- **覆盖时间**：2026-10-03 ~ 2026-10-05
+- **主要主题**：项目初始化、脱敏、Phase 0 技术验证、Phase 1 工程骨架与核心纯逻辑、Phase 2 单站发布闭环、Phase 3 完整内容转换与隔离、Phase 4 多站点与目录模式、Phase 5 管理面板
 
 ---
 

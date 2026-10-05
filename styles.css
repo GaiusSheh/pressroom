@@ -128,3 +128,103 @@
 .pressroom-all-block {
 	margin-bottom: var(--size-4-4);
 }
+
+/* 管理面板 */
+.pressroom-panel {
+	width: min(900px, 90vw);
+}
+
+.pressroom-panel-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-1);
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: var(--size-4-2);
+}
+
+.pressroom-panel-tab.is-active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.pressroom-panel-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-2);
+	margin: var(--size-4-2) 0;
+}
+
+/* 计数为 0 或状态未算完时禁用：要看得出来 */
+.pressroom-panel-toolbar button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.pressroom-panel-progress {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.pressroom-panel-refresh {
+	margin-left: auto;
+}
+
+/* 固定高度：条目数变化时弹窗不再上下跳动 */
+.pressroom-panel-body {
+	height: 60vh;
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.pressroom-panel-folder > summary {
+	cursor: pointer;
+	font-weight: var(--font-semibold);
+	padding: var(--size-2-1) 0;
+}
+
+.pressroom-panel-children {
+	padding-left: var(--size-4-4);
+}
+
+.pressroom-panel-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-1) 0;
+}
+
+.pressroom-panel-names {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-width: 0;
+}
+
+.pressroom-panel-vault {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pressroom-panel-status {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.pressroom-panel-status.mod-synced {
+	color: var(--text-success);
+}
+
+.pressroom-panel-status.mod-modified,
+.pressroom-panel-status.mod-moved {
+	color: var(--text-warning);
+}
+
+.pressroom-panel-status.mod-deleted,
+.pressroom-panel-status.mod-error {
+	color: var(--text-error);
+}

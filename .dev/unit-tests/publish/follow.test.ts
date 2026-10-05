@@ -200,6 +200,16 @@ describe('已移动与挪动', () => {
 		expect(t.file('content/b.md')).toBe('见 [a](<新/a>)');
 	});
 
+	it('挪动后有多个 aliases 时状态为已同步（发布副本中 aliases 顺序与 manifest 读回一致）', async () => {
+		const t = await setup({
+			notes: { '新/a.md': '正文' },
+			repoFiles: { 'content/旧/a.md': '旧', [MANIFEST_PATH]: manifestFile('follow', [record('新/a.md', '旧/a.md', ['更早'])]) },
+		});
+		await publishBatch(t.ctx, [await t.item('新/a.md')], { message: t.message });
+		const snap = await loadSnapshot(t.ctx);
+		expect(await noteStatus(t.ctx, await t.item('新/a.md'), snap)).toMatchObject({ kind: 'synced', moved: false });
+	});
+
 	it('aliasFor 去掉 .md', () => {
 		expect(aliasFor('旧/示例笔记.md')).toBe('旧/示例笔记');
 	});

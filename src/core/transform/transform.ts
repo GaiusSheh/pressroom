@@ -166,6 +166,17 @@ function render(note: ParsedNote, start: number, end: number, ctx: TransformCont
 	return out + note.text.slice(pos, end);
 }
 
+/**
+ * 已有的 aliases 属性值（字符串或列表）与 Pressroom 写入的合并去重，已有的在前。
+ * Pressroom 的按码点排序：manifest 序列化时 aliases 已排序，读回后的顺序与写入时不同，
+ * 不排序会使同一内容生成不同的发布副本，挪动后被误判为「有修改」
+ */
+export function mergeAliases(own: unknown, extra: string[]): string[] {
+	const ownList = Array.isArray(own) ? own.map(String) : typeof own === 'string' && own !== '' ? [own] : [];
+	const ours = [...extra].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+	return [...new Set([...ownList, ...ours])];
+}
+
 /** frontmatter 只保留白名单属性（按原顺序），再加上 Pressroom 的 aliases；无剩余属性时去掉整个 frontmatter */
 function frontmatterBlock(note: ParsedNote, ctx: TransformContext): string {
 	const data = note.frontmatter?.data ?? {};
@@ -173,12 +184,7 @@ function frontmatterBlock(note: ParsedNote, ctx: TransformContext): string {
 	for (const [key, value] of Object.entries(data)) {
 		if (ctx.whitelist.includes(key)) kept[key] = value;
 	}
-	if (ctx.aliases?.length) {
-		const own = kept.aliases;
-		// 笔记自带的 aliases 可能是字符串或列表
-		const ownList = Array.isArray(own) ? own.map(String) : typeof own === 'string' && own !== '' ? [own] : [];
-		kept.aliases = [...new Set([...ownList, ...ctx.aliases])];
-	}
+	if (ctx.aliases?.length) kept.aliases = mergeAliases(kept.aliases, ctx.aliases);
 	if (Object.keys(kept).length === 0) return '';
 	const yaml = ctx.stringifyYaml(kept);
 	return `---\n${yaml.endsWith('\n') ? yaml : `${yaml}\n`}---\n`;

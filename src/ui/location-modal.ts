@@ -19,7 +19,28 @@ export function chooseLocation(
 	vaultPath: string,
 	unpublishedLinks: string[] = [],
 ): Promise<string | undefined> {
-	return new Promise((resolve) => new LocationModal(app, { site, snap, vaultPath, unpublishedLinks }, resolve).open());
+	return new Promise((resolve) =>
+		new LocationModal(app, { site, snap, vaultPath, unpublishedLinks }, resolve, {
+			title: t('location.title', { site: site.name }),
+			button: t('location.publish'),
+		}).open(),
+	);
+}
+
+/**
+ * 管理面板的站内改名 / 移动（需求 §5.3，仅手动站点）：同一位置弹窗，预填当前站内位置、不含双链处理，
+ * 冲突检测排除本篇当前位置。确认返回新站内路径；未改变或取消返回 undefined
+ */
+export function chooseMoveLocation(app: App, site: SiteConfig, snap: SiteSnapshot, vaultPath: string, sitePath: string): Promise<string | undefined> {
+	const parts = sitePath.split('/');
+	const initial = { dir: parts.slice(0, -1).join('/'), name: stem(sitePath) };
+	return new Promise((resolve) =>
+		new LocationModal(app, { site, snap, vaultPath, unpublishedLinks: [], initial, exclude: sitePath }, (p) => resolve(p === sitePath ? undefined : p), {
+			title: t('move.title', { site: site.name }),
+			button: t('move.confirm'),
+			note: snap.aliasRedirects ? undefined : t('move.noRedirect'),
+		}).open(),
+	);
 }
 
 /** 列表最多显示的名称数，其余以「等 N 篇」概括 */
@@ -30,6 +51,10 @@ export interface LocationInput {
 	snap: SiteSnapshot;
 	vaultPath: string;
 	unpublishedLinks: string[];
+	/** 预填的目录与名称（移动时为当前站内位置）；缺省为站点根 + vault 文件名 */
+	initial?: { dir: string; name: string };
+	/** 冲突检测排除的站内路径（移动时为本篇当前位置） */
+	exclude?: string;
 }
 
 /**
@@ -37,7 +62,7 @@ export interface LocationInput {
  * 单站弹窗与「全部站点」的分块弹窗共用
  */
 export class LocationBlock {
-	private dir = '';
+	private dir: string;
 	private name: string;
 	private previewEl?: HTMLElement;
 	private messageEl?: HTMLElement;
@@ -48,7 +73,8 @@ export class LocationBlock {
 		/** 输入变化（调用方据此启用 / 禁用发布按钮） */
 		private readonly onChange: () => void,
 	) {
-		this.name = stem(input.vaultPath);
+		this.dir = input.initial?.dir ?? '';
+		this.name = input.initial?.name ?? stem(input.vaultPath);
 	}
 
 	render(el: HTMLElement) {
@@ -74,7 +100,7 @@ export class LocationBlock {
 
 		new Setting(el).setName(t('location.dir')).addText((text) => {
 			dirText = text;
-			text.setPlaceholder(t('location.dir.placeholder')).onChange((v) => {
+			text.setPlaceholder(t('location.dir.placeholder')).setValue(this.dir).onChange((v) => {
 				this.dir = v;
 				this.refresh();
 			});
@@ -133,7 +159,7 @@ export class LocationBlock {
 		if (!isValidDir(this.dir)) errors.push(t('location.invalidDir'));
 		if (errors.length) return { errors, warnings };
 		const path = this.sitePath();
-		const conflicts = findConflicts(path, slugOwners(this.input.snap));
+		const conflicts = findConflicts(path, slugOwners(this.input.snap), this.input.exclude);
 		if (conflicts.length) {
 			const other = conflicts.map((c) => (c.owner.kind === 'file' ? c.owner.path : c.owner.alias)).join('、');
 			errors.push(t('location.conflict', { other }));
@@ -164,6 +190,7 @@ class LocationModal extends Modal {
 		app: App,
 		private readonly input: LocationInput,
 		private readonly resolve: (sitePath: string | undefined) => void,
+		private readonly texts: { title: string; button: string; note?: string },
 	) {
 		super(app);
 		this.block = new LocationBlock(app, input, () => this.refresh());
@@ -171,13 +198,14 @@ class LocationModal extends Modal {
 
 	onOpen() {
 		const { contentEl } = this;
-		this.setTitle(t('location.title', { site: this.input.site.name }));
+		this.setTitle(this.texts.title);
 		this.block.render(contentEl);
+		if (this.texts.note) contentEl.createDiv({ text: this.texts.note, cls: 'pressroom-conn-line mod-warn' });
 		new Setting(contentEl)
 			.addButton((b) => b.setButtonText(t('common.cancel')).onClick(() => this.close()))
 			.addButton((b) => {
 				this.publishButton = b.buttonEl;
-				b.setButtonText(t('location.publish'))
+				b.setButtonText(this.texts.button)
 					.setCta()
 					.onClick(() => {
 						if (!this.block.valid()) return;

@@ -6,7 +6,9 @@ import type PressroomPlugin from '../main';
 import { GitHubBackend } from '../core/backend/github';
 import { publishedBacklinks, unpublishedLinkTargets } from '../core/backlinks';
 import { scanCompanions } from '../core/companions';
-import { findConflicts } from '../core/generator/quartz';
+import { findConflicts, urlOf } from '../core/generator/quartz';
+import type { NoteRecord } from '../core/manifest/manifest';
+import type { BatchKind, PanelStatus } from '../core/panel';
 import { isExcluded, stem } from '../core/note';
 import {
 	type NoteStatus,
@@ -22,6 +24,7 @@ import {
 	noteStatus,
 	prepareNote,
 	publishBatch,
+	relocateBatch,
 	setMode,
 	slugOwners,
 } from '../core/publish';
@@ -35,7 +38,7 @@ import { backlinkSources, obsidianVault, parseNote } from '../platform/vault';
 import { commitMessage } from './commit-message';
 import { confirm, confirmWithOption } from './confirm-modal';
 import { describeError } from './errors';
-import { chooseLocation } from './location-modal';
+import { chooseLocation, chooseMoveLocation } from './location-modal';
 import { chooseAllLocations } from './publish-modal';
 import { RenameQueue } from './renames';
 import { chooseCompanions } from './companions-modal';
@@ -293,47 +296,56 @@ export class PressroomActions {
 			if (picked === 'all') return this.publishAll(file, sites, statuses);
 			site = picked;
 			if (!site) return;
-			const chosen = site;
-			const ctx = await this.context(chosen);
-			let sitePath: string | undefined;
-			let companions: string[] = [];
-			const firstPublish = statuses.get(chosen.id)?.kind === 'unpublished';
-			// 最新快照：冲突检测、连带清单、别名跳转提示都基于它（读取时已按仓库同步目录模式）
-			const snap = await this.snapshot(chosen, true);
-			if (chosen.mode === 'follow') {
-				// 跟随 vault 站点：位置即 vault 位置，不弹位置窗口；指向本站未发布笔记的链接按双链处理（需求 §7）
-				const picked = await this.pickCompanions(ctx, chosen, snap, file);
-				if (!picked) return;
-				companions = picked;
-			} else if (firstPublish) {
-				// 手动站点首次发布：列出本篇中未在本站发布的链接
-				const unpublished = await this.unpublishedNames(ctx, snap, file);
-				sitePath = await chooseLocation(this.plugin.app, chosen, snap, file.path, unpublished);
-				if (!sitePath) return;
-			}
-			const working = new Notice(t('notice.working', { site: chosen.name }), 0);
-			try {
-				const items = [await this.prepare(ctx, file, sitePath), ...(await Promise.all(this.files(companions).map((f) => this.prepare(ctx, f))))];
-				const out = await publishBatch(ctx, items, { message: commitMessage });
-				this.invalidate(chosen);
-				const item = out.items[0]!;
-				const key =
-					out.commitSha === undefined || item.kind === 'upToDate'
-						? 'notice.upToDate'
-						: item.kind === 'published'
-							? 'notice.published'
-							: item.kind === 'moved'
-								? snap.aliasRedirects
-									? 'notice.moved'
-									: 'notice.movedNoRedirect'
-								: 'notice.updated';
-				const extra = companions.length ? ` ${t('notice.companions', { n: companions.length })}` : '';
-				const action = firstPublish && out.commitSha ? await this.backlinkAction(chosen, file) : undefined;
-				this.notice(t(key, { site: chosen.name }) + extra, item.url, action);
-			} finally {
-				working.hide();
-			}
+			await this.publishOn(file, site);
 		});
+	}
+
+	/** 管理面板的「更新」：对指定站点执行与右键发布相同的单站流程 */
+	async publishOnSite(file: TFile, site: SiteConfig): Promise<void> {
+		await this.guard(() => site, () => this.publishOn(file, site));
+	}
+
+	/** 单站发布 / 更新（跟随站点：连带清单、已移动即同步；手动站点首次发布：位置弹窗）；之后的反向链接提醒 */
+	private async publishOn(file: TFile, chosen: SiteConfig): Promise<void> {
+		const ctx = await this.context(chosen);
+		let sitePath: string | undefined;
+		let companions: string[] = [];
+		// 最新快照：冲突检测、连带清单、别名跳转提示都基于它（读取时已按仓库同步目录模式）
+		const snap = await this.snapshot(chosen, true);
+		const firstPublish = !snap.manifest.notes.some((n) => n.vaultPath === file.path);
+		if (chosen.mode === 'follow') {
+			// 跟随 vault 站点：位置即 vault 位置，不弹位置窗口；指向本站未发布笔记的链接按双链处理（需求 §7）
+			const picked = await this.pickCompanions(ctx, chosen, snap, [file]);
+			if (!picked) return;
+			companions = picked;
+		} else if (firstPublish) {
+			// 手动站点首次发布：列出本篇中未在本站发布的链接
+			const unpublished = await this.unpublishedNames(ctx, snap, file);
+			sitePath = await chooseLocation(this.plugin.app, chosen, snap, file.path, unpublished);
+			if (!sitePath) return;
+		}
+		const working = new Notice(t('notice.working', { site: chosen.name }), 0);
+		try {
+			const items = [await this.prepare(ctx, file, sitePath), ...(await Promise.all(this.files(companions).map((f) => this.prepare(ctx, f))))];
+			const out = await publishBatch(ctx, items, { message: commitMessage });
+			this.invalidate(chosen);
+			const item = out.items[0]!;
+			const key =
+				out.commitSha === undefined || item.kind === 'upToDate'
+					? 'notice.upToDate'
+					: item.kind === 'published'
+						? 'notice.published'
+						: item.kind === 'moved'
+							? snap.aliasRedirects
+								? 'notice.moved'
+								: 'notice.movedNoRedirect'
+							: 'notice.updated';
+			const extra = companions.length ? ` ${t('notice.companions', { n: companions.length })}` : '';
+			const action = firstPublish && out.commitSha ? await this.backlinkAction(chosen, file) : undefined;
+			this.notice(t(key, { site: chosen.name }) + extra, item.url, action);
+		} finally {
+			working.hide();
+		}
 	}
 
 	/** 手动站点首次发布时说明的：本篇中指向本站未发布笔记的链接（显示名） */
@@ -377,7 +389,7 @@ export class PressroomActions {
 		// 跟随 vault 站点的连带清单（各站一个弹窗；任一取消则整体取消，此时尚未提交任何内容）
 		const companions = new Map<string, string[]>();
 		for (const site of sites.filter((s) => s.mode === 'follow')) {
-			const picked = await this.pickCompanions(await this.context(site), site, await this.snapshot(site, true), file);
+			const picked = await this.pickCompanions(await this.context(site), site, await this.snapshot(site, true), [file]);
 			if (!picked) return;
 			companions.set(site.id, picked);
 		}
@@ -434,32 +446,42 @@ export class PressroomActions {
 	 * 首次发布时默认取设置；更新时只看上次发布后新出现的链接，设置为纯文本时不询问（绝不静默多发）。
 	 * 没有这类链接时直接返回空；用户取消返回 undefined
 	 */
-	private async pickCompanions(ctx: PublishContext, site: SiteConfig, snap: SiteSnapshot, file: TFile): Promise<string[] | undefined> {
-		const record = snap.manifest.notes.find((n) => n.vaultPath === file.path);
+	private async pickCompanions(ctx: PublishContext, site: SiteConfig, snap: SiteSnapshot, files: TFile[]): Promise<string[] | undefined> {
+		const records = new Map(snap.manifest.notes.map((n) => [n.vaultPath, n]));
+		const update = files.every((f) => records.has(f.path));
 		const policy = this.plugin.settings.linkPolicy;
-		if (record && policy === 'plain') return [];
+		if (update && policy === 'plain') return [];
 		const app = this.plugin.app;
-		const published = new Set(snap.manifest.notes.map((n) => n.vaultPath));
-		const deps = {
-			load: async (p: string) => {
-				const f = app.vault.getAbstractFileByPath(p);
-				return f instanceof TFile ? parseNote(app, f) : undefined;
-			},
-			resolve: (target: string, from: string) => ctx.vault.resolve(target, from),
-			excluded: (p: string) => isExcluded(p, ctx.excludedFolders),
-			publishedOnSite: (p: string) => published.has(p),
-			known: record ? new Set(record.plainLinks ?? []) : undefined,
+		// 本批的笔记也算「已在本站」（它们会在同一次提交中发布）
+		const published = new Set([...records.keys(), ...files.map((f) => f.path)]);
+		const depsFor = (file: TFile) => {
+			const record = records.get(file.path);
+			return {
+				load: async (p: string) => {
+					const f = app.vault.getAbstractFileByPath(p);
+					return f instanceof TFile ? parseNote(app, f) : undefined;
+				},
+				resolve: (target: string, from: string) => ctx.vault.resolve(target, from),
+				excluded: (p: string) => isExcluded(p, ctx.excludedFolders),
+				publishedOnSite: (p: string) => published.has(p),
+				known: record ? new Set(record.plainLinks ?? []) : undefined,
+			};
 		};
-		const note = await parseNote(app, file);
-		const one = await scanCompanions(note, deps, false);
+		const notes = await Promise.all(files.map(async (f) => ({ note: await parseNote(app, f), deps: depsFor(f) })));
+		// 多篇时合并各篇的收集结果（去重，保持顺序）
+		const scan = async (deep: boolean) => {
+			const parts = await Promise.all(notes.map(({ note, deps }) => scanCompanions(note, deps, deep)));
+			return { paths: [...new Set(parts.flatMap((p) => p.paths))], truncated: parts.some((p) => p.truncated) };
+		};
+		const one = await scan(false);
 		if (one.paths.length === 0) return [];
 		const owners = slugOwners(snap);
 		return chooseCompanions(app, {
 			site,
-			update: record !== undefined,
+			update,
 			defaultPolicy: policy,
 			one,
-			scanAll: () => scanCompanions(note, deps, true),
+			scanAll: () => scan(true),
 			conflict: (p) => {
 				const found = findConflicts(p, owners);
 				return found.length
@@ -514,37 +536,50 @@ export class PressroomActions {
 			if (picked === 'all') return this.unpublishAll(file, this.publishedOn(sites, statuses));
 			site = picked;
 			if (!site) return;
-			const chosen = site;
-			const status = statuses.get(chosen.id);
-			const url = status && status.kind !== 'unpublished' ? status.url : '';
-			// 反向链接：撤稿后它们的链接会失效，默认勾选一并更新（链接改为纯文本）
-			const snap = await this.snapshot(chosen, true);
-			const backlinks = this.files(publishedBacklinks(file.path, backlinkSources(this.plugin.app, file.path), snap.manifest));
-			const names = backlinks.map((f) => f.basename).join(t('common.listSep'));
-			const answer = await confirmWithOption(this.plugin.app, {
-				title: t('unpublish.title', { site: chosen.name }),
-				body: t('unpublish.body', { url }),
-				confirmText: t('unpublish.confirm'),
-				cancelText: t('common.cancel'),
-				destructive: true,
-				option: backlinks.length
-					? { label: t('unpublish.alsoUpdate', { n: backlinks.length }), desc: t('unpublish.alsoUpdate.desc', { names }), checked: true }
-					: undefined,
-			});
-			if (!answer.ok) return;
-			const working = new Notice(t('notice.unpublishing', { site: chosen.name }), 0);
-			let removed = false;
-			try {
-				const ctx = await this.context(chosen);
-				const items = answer.checked ? await Promise.all(backlinks.map((f) => this.prepare(ctx, f))) : [];
-				const out = await publishBatch(ctx, items, { unpublish: [file.path], message: commitMessage });
-				this.invalidate(chosen);
-				removed = out.items.some((i) => i.kind === 'unpublished');
-			} finally {
-				working.hide();
-			}
-			new Notice(t(removed ? 'notice.unpublished' : 'notice.notPublished', { site: chosen.name }), 10_000);
+			await this.unpublishOn(file.path, site);
 		});
+	}
+
+	/** 管理面板的「撤稿」（源笔记已删除的也可以） */
+	async unpublishOnSite(vaultPath: string, site: SiteConfig): Promise<void> {
+		await this.guard(() => site, () => this.unpublishOn(vaultPath, site));
+	}
+
+	/** 单站撤稿：确认框（反向链接默认一并更新为纯文本）→ 一次提交 */
+	private async unpublishOn(vaultPath: string, chosen: SiteConfig): Promise<void> {
+		// 反向链接：撤稿后它们的链接会失效，默认勾选一并更新（链接改为纯文本）
+		const snap = await this.snapshot(chosen, true);
+		const record = snap.manifest.notes.find((n) => n.vaultPath === vaultPath);
+		if (!record) {
+			new Notice(t('notice.notPublished', { site: chosen.name }));
+			return;
+		}
+		const url = urlOf(chosen.siteUrl, record.sitePath);
+		const backlinks = this.files(publishedBacklinks(vaultPath, backlinkSources(this.plugin.app, vaultPath), snap.manifest));
+		const names = backlinks.map((f) => f.basename).join(t('common.listSep'));
+		const answer = await confirmWithOption(this.plugin.app, {
+			title: t('unpublish.title', { site: chosen.name }),
+			body: t('unpublish.body', { url }),
+			confirmText: t('unpublish.confirm'),
+			cancelText: t('common.cancel'),
+			destructive: true,
+			option: backlinks.length
+				? { label: t('unpublish.alsoUpdate', { n: backlinks.length }), desc: t('unpublish.alsoUpdate.desc', { names }), checked: true }
+				: undefined,
+		});
+		if (!answer.ok) return;
+		const working = new Notice(t('notice.unpublishing', { site: chosen.name }), 0);
+		let removed = false;
+		try {
+			const ctx = await this.context(chosen);
+			const items = answer.checked ? await Promise.all(backlinks.map((f) => this.prepare(ctx, f))) : [];
+			const out = await publishBatch(ctx, items, { unpublish: [vaultPath], message: commitMessage });
+			this.invalidate(chosen);
+			removed = out.items.some((i) => i.kind === 'unpublished');
+		} finally {
+			working.hide();
+		}
+		new Notice(t(removed ? 'notice.unpublished' : 'notice.notPublished', { site: chosen.name }), 10_000);
 	}
 
 	/**
@@ -626,6 +661,212 @@ export class PressroomActions {
 			const status = statuses.get(site.id);
 			if (status && status.kind !== 'unpublished') await use(status.url);
 		});
+	}
+
+	// —— 管理面板、批量按钮与多选（Phase 5，需求 §4、§6） ——
+
+	/** 管理面板的选项卡：可用站点；仓库 + 分支重复的站点另行返回以便提示 */
+	panelSites(): { sites: SiteConfig[]; clashing: SiteConfig[] } {
+		const [sites, clashing] = this.usableSites();
+		return { sites, clashing };
+	}
+
+	/** 面板读取站点：总是最新快照（顺带补写未写回的改名） */
+	async panelSnapshot(site: SiteConfig): Promise<SiteSnapshot> {
+		void this.renames.flush();
+		return this.snapshot(site, true);
+	}
+
+	/**
+	 * 逐篇计算面板状态（需求 §6.1）：源笔记不在 vault → 源笔记已删除；否则准备笔记并按快照判定。
+	 * 并发 4 篇，每篇算完即回调（界面逐篇填入）；cancelled() 为真时停止（切换选项卡、关闭面板）
+	 */
+	async panelStatuses(
+		site: SiteConfig,
+		snap: SiteSnapshot,
+		onStatus: (vaultPath: string, status: PanelStatus) => void,
+		cancelled: () => boolean,
+	): Promise<void> {
+		const ctx = await this.context(site);
+		const queue = [...snap.manifest.notes];
+		const worker = async () => {
+			while (queue.length > 0 && !cancelled()) {
+				const record = queue.shift()!;
+				const status = await this.panelStatusOf(ctx, snap, record);
+				if (!cancelled()) onStatus(record.vaultPath, status);
+			}
+		};
+		await Promise.all(Array.from({ length: 4 }, worker));
+	}
+
+	private async panelStatusOf(ctx: PublishContext, snap: SiteSnapshot, record: NoteRecord): Promise<PanelStatus> {
+		const file = this.plugin.app.vault.getAbstractFileByPath(record.vaultPath);
+		if (!(file instanceof TFile)) return { kind: 'deleted' };
+		try {
+			const s = await noteStatus(ctx, await this.prepare(ctx, file), snap);
+			return s.kind === 'unpublished' ? { kind: 'deleted' } : { kind: s.kind, moved: s.moved };
+		} catch (e) {
+			console.warn('[Pressroom] 计算状态失败', record.vaultPath, e);
+			return { kind: 'error', message: describeError(e, ctx.site.repo) };
+		}
+	}
+
+	/** 管理面板的站内改名 / 移动（需求 §5.3，仅手动站点）：一次提交，旧路径写入 aliases */
+	async moveOnSite(file: TFile, site: SiteConfig): Promise<void> {
+		await this.guard(() => site, async () => {
+			const snap = await this.snapshot(site, true);
+			const record = snap.manifest.notes.find((n) => n.vaultPath === file.path);
+			if (!record) {
+				new Notice(t('notice.notPublished', { site: site.name }));
+				return;
+			}
+			const target = await chooseMoveLocation(this.plugin.app, site, snap, file.path, record.sitePath);
+			if (!target) return;
+			const working = new Notice(t('notice.working', { site: site.name }), 0);
+			try {
+				const ctx = await this.context(site);
+				const out = await publishBatch(ctx, [{ ...(await this.prepare(ctx, file)), moveTo: target }], { message: commitMessage });
+				this.invalidate(site);
+				this.notice(t(snap.aliasRedirects ? 'move.done' : 'move.doneNoRedirect', { site: site.name }), out.items[0]!.url);
+			} finally {
+				working.hide();
+			}
+		});
+	}
+
+	/**
+	 * 管理面板的批量按钮（需求 §6.2）：先列清单确认，再一次提交。
+	 * 一键同步 / 更新时新出现的未发布链接按设置默认值处理（跟随站点，默认为连带时弹清单）
+	 */
+	async runBatch(site: SiteConfig, kind: BatchKind, vaultPaths: string[]): Promise<void> {
+		if (vaultPaths.length === 0) return;
+		await this.guard(() => site, async () => {
+			const snap = await this.snapshot(site, true);
+			const records = new Map(snap.manifest.notes.map((n) => [n.vaultPath, n]));
+			const items = vaultPaths.map((p) => {
+				const r = records.get(p);
+				if (!r) return p;
+				const moving = (kind === 'sync' || kind === 'relocate') && r.sitePath !== r.vaultPath;
+				return moving ? t('commit.movePair', { from: r.sitePath, to: r.vaultPath }) : r.sitePath;
+			});
+			const n = vaultPaths.length;
+			const ok = await confirm(this.plugin.app, {
+				title: t(`batch.${kind}.title` as const, { site: site.name, n }),
+				// 涉及挪动时按站点是否开启别名跳转说明旧网址的去向（GUI 测试反馈：未开启时不能写「会跳转」）
+				body: t(`batch.${kind}.body` as const, { redirect: t(snap.aliasRedirects ? 'batch.redirect' : 'move.noRedirect') }),
+				confirmText: t(`batch.${kind}.confirm` as const),
+				cancelText: t('common.cancel'),
+				destructive: kind === 'cleanup',
+				details: { summary: t('batch.list', { n }), items },
+			});
+			if (!ok) return;
+			const ctx = await this.context(site);
+			let companions: string[] = [];
+			const files = this.files(vaultPaths);
+			if ((kind === 'sync' || kind === 'update') && site.mode === 'follow') {
+				const picked = await this.pickCompanions(ctx, site, snap, files);
+				if (!picked) return;
+				companions = picked;
+			}
+			const working = new Notice(t('batch.working', { site: site.name }), 0);
+			try {
+				let out;
+				if (kind === 'cleanup') {
+					out = await publishBatch(ctx, [], { unpublish: vaultPaths, message: commitMessage });
+				} else if (kind === 'relocate') {
+					out = await relocateBatch(ctx, vaultPaths, commitMessage);
+				} else {
+					const prepared = await Promise.all([...files, ...this.files(companions)].map((f) => this.prepare(ctx, f)));
+					out = await publishBatch(ctx, prepared, { message: commitMessage, move: kind === 'update' ? 'never' : 'auto' });
+				}
+				this.invalidate(site);
+				const changed = out.items.filter((i) => i.kind !== 'upToDate').length;
+				const moved = out.items.some((i) => i.kind === 'moved');
+				const text = out.commitSha === undefined ? t('batch.noChange', { site: site.name }) : t('batch.done', { site: site.name, n: changed });
+				new Notice(moved && !snap.aliasRedirects ? `${text} ${t('move.noRedirect')}` : text, 10_000);
+			} finally {
+				working.hide();
+			}
+		});
+	}
+
+	/**
+	 * 文件列表多选发布（需求 §4）：每站一次提交。手动站点上尚未发布的笔记跳过并说明（2026-10-05 用户决定）；
+	 * 跟随站点照常发布（含连带清单）；排除文件夹与非 Markdown 文件跳过
+	 */
+	async publishMany(files: TFile[]): Promise<void> {
+		const notes = files.filter((f) => this.canHandle(f));
+		if (notes.length < files.length) new Notice(t('many.skippedExcluded', { n: files.length - notes.length }));
+		if (notes.length === 0) return;
+		const sites = this.sites();
+		if (sites.length === 0) return;
+		let current: SiteConfig | undefined;
+		await this.guard(() => current, async () => {
+			const targets = await this.pickTargets(sites, t('picker.publishMany', { n: notes.length }));
+			if (!targets) return;
+			// 所有确认（连带清单）都在任何提交之前完成，取消即整体取消
+			const plans = new Map<string, { files: TFile[]; companions: string[]; skipped: number }>();
+			for (const site of targets) {
+				current = site;
+				const snap = await this.snapshot(site, true);
+				const published = new Set(snap.manifest.notes.map((n) => n.vaultPath));
+				const publishable = notes.filter((f) => published.has(f.path) || site.mode === 'follow');
+				let companions: string[] = [];
+				if (site.mode === 'follow' && publishable.length) {
+					const picked = await this.pickCompanions(await this.context(site), site, snap, publishable);
+					if (!picked) return;
+					companions = picked;
+				}
+				plans.set(site.id, { files: publishable, companions, skipped: notes.length - publishable.length });
+			}
+			await this.runOnSites(targets, t('many.working', { n: notes.length, sites: targets.length }), async (site) => {
+				const plan = plans.get(site.id)!;
+				const skip = plan.skipped ? ` ${t('many.skipManual', { n: plan.skipped })}` : '';
+				if (plan.files.length === 0) return { text: t('many.nothing') + skip, committed: false };
+				const ctx = await this.context(site);
+				const prepared = await Promise.all([...plan.files, ...this.files(plan.companions)].map((f) => this.prepare(ctx, f)));
+				const out = await publishBatch(ctx, prepared, { message: commitMessage });
+				const count = (k: string) => out.items.filter((i) => i.kind === k).length;
+				const text = t('many.result', { published: count('published'), updated: count('updated'), moved: count('moved'), upToDate: count('upToDate') });
+				return { text: text + skip, committed: out.commitSha !== undefined };
+			});
+		});
+	}
+
+	/** 文件列表多选撤稿：一个确认框，每站一次提交（只撤本站已发布的） */
+	async unpublishMany(files: TFile[]): Promise<void> {
+		const notes = files.filter((f) => f.extension === 'md');
+		if (notes.length === 0) return;
+		const sites = this.sites();
+		if (sites.length === 0) return;
+		let current: SiteConfig | undefined;
+		await this.guard(() => current, async () => {
+			const targets = await this.pickTargets(sites, t('picker.unpublishMany', { n: notes.length }));
+			if (!targets) return;
+			const ok = await confirm(this.plugin.app, {
+				title: t('many.unpublish.title', { n: notes.length }),
+				body: t('many.unpublish.body', { names: targets.map((s) => s.name).join(t('common.listSep')) }),
+				confirmText: t('unpublish.confirm'),
+				cancelText: t('common.cancel'),
+				destructive: true,
+				details: { summary: t('batch.list', { n: notes.length }), items: notes.map((f) => f.path) },
+			});
+			if (!ok) return;
+			await this.runOnSites(targets, t('all.unpublishing', { n: targets.length }), async (site) => {
+				current = site;
+				const out = await publishBatch(await this.context(site), [], { unpublish: notes.map((f) => f.path), message: commitMessage });
+				const n = out.items.filter((i) => i.kind === 'unpublished').length;
+				return { text: t('many.unpublished', { n }), committed: out.commitSha !== undefined };
+			});
+		});
+	}
+
+	/** 多选操作的站点选择：一个站点时直接用；多个时可选「全部站点」 */
+	private async pickTargets(sites: SiteConfig[], placeholder: string): Promise<SiteConfig[] | undefined> {
+		if (sites.length === 1) return sites;
+		const picked = await pickSite(this.plugin.app, sites.map((site) => ({ site })), placeholder, { label: t('picker.all') });
+		if (!picked) return undefined;
+		return picked === 'all' ? sites : [picked];
 	}
 
 	/** 结果提示：复制链接按钮；可选的附加说明与操作按钮（如反向链接的「一并更新」） */

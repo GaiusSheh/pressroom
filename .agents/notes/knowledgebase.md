@@ -18,6 +18,8 @@
 | `src/ui/actions.ts` | 四个操作的流程与站点快照缓存（30 秒）、跨站上下文、反向链接提醒、跟随站点的连带清单、「全部站点」（逐站执行 + 汇总）、模式切换写回 |
 | `src/ui/renames.ts` | vault 改名监听与待写队列（防抖自动提交、`data.json` 的 `pendingRenames`） |
 | `src/ui/companions-modal.ts`、`publish-modal.ts` | 连带清单弹窗（三选一 + 勾选）；「全部站点」分块位置弹窗 |
+| `src/core/panel.ts` | 管理面板数据：站内目录树、各批量按钮显示与作用对象 |
+| `src/ui/panel/panel-modal.ts` | 管理面板弹窗（选项卡、批量按钮、目录树、单项菜单；状态逐篇填入） |
 | `src/core/renames.ts`、`companions.ts` | 改名映射应用到 manifest；连带收集（一层 / 到底） |
 | `src/ui/commit-message.ts` | 提交信息（单篇 / 多篇分段，只含站内路径） |
 | `src/ui/menu.ts`、`location-modal.ts`、`site-picker.ts`、`errors.ts` | 右键菜单与命令、首次发布位置弹窗（`LocationBlock` 可复用）、站点选择（含「全部站点」）、错误文字 |

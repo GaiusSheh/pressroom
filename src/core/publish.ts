@@ -19,7 +19,7 @@ import {
 import { type ParsedNote, type VaultAccess, isExcluded } from './note';
 import { type Rename, applyRenames } from './renames';
 import { type EmbedMap, loadEmbeds } from './transform/embed';
-import { collectAttachments, transformNote } from './transform/transform';
+import { collectAttachments, mergeAliases, transformNote } from './transform/transform';
 import type { DirMode, SiteConfig } from './types';
 
 export interface PublishContext {
@@ -234,6 +234,8 @@ async function render(
 export interface PublishItem extends PreparedNote {
 	/** 手动站点首次发布的站内路径（相对内容目录，含 .md）；已发布的笔记、跟随 vault 站点忽略此项 */
 	sitePath?: string;
+	/** 已发布的笔记移到这个站内路径（管理面板的站内改名 / 移动，需求 §5.3）：删旧、写新、旧路径写入 aliases */
+	moveTo?: string;
 }
 
 export type ItemOutcome = {
@@ -266,6 +268,11 @@ export interface BatchOptions {
 	message: (summary: BatchSummary) => string;
 	/** 撤下的笔记（vault 路径）；与 items 在同一次提交中处理 */
 	unpublish?: string[];
+	/**
+	 * auto（默认）：跟随 vault 站点上已移动的笔记挪到 vault 位置；
+	 * never：已发布的笔记一律在原位置更新（管理面板「一键更新」，需求 §6.2）
+	 */
+	move?: 'auto' | 'never';
 }
 
 /**
@@ -300,9 +307,11 @@ export async function publishBatch(ctx: PublishContext, items: PublishItem[], op
 			const conflicts: PublishConflictError[] = [];
 			const owners = slugOwners(snap);
 			const batchNew: { vaultPath: string; sitePath: string }[] = [];
-			for (const { note, sitePath } of items) {
+			for (const { note, sitePath, moveTo } of items) {
 				const record = records.get(note.vaultPath);
-				const target = follow ? note.vaultPath : (record?.sitePath ?? sitePath);
+				// moveTo：显式移到指定位置（手动站点的站内改名 / 移动）；move = 'never'：已发布的原位更新（一键更新，「已移动」保留）
+				const keep = opts.move === 'never' && record !== undefined;
+				const target = moveTo ?? (keep ? record.sitePath : follow ? note.vaultPath : (record?.sitePath ?? sitePath));
 				if (!target) throw new Error(`笔记 ${note.vaultPath} 尚未发布到「${ctx.site.name}」，首次发布需要指定站内路径`);
 				targets.set(note.vaultPath, target);
 				if (record?.sitePath === target) continue;
@@ -403,6 +412,92 @@ export async function publishBatch(ctx: PublishContext, items: PublishItem[], op
 					attachments: [...snap.manifest.attachments, ...allocation.newRecords],
 				}),
 			);
+			return changes;
+		},
+	);
+	return { items: outcomes, commitSha: result?.commitSha };
+}
+
+/** 一键重排不能用于 relative 链接策略的站点（正文相对链接换位置会失效，需求 §6.2 2026-10-05 决定） */
+export class RelocateUnsupportedError extends Error {
+	constructor() {
+		super('站点使用 relative 链接策略，挪动位置会使正文中的相对链接失效，不能一键重排；请使用一键同步');
+		this.name = 'RelocateUnsupportedError';
+	}
+}
+
+/**
+ * 在发布副本的 frontmatter 中换上新的 Pressroom aliases，正文原样保留。
+ * 副本中已有的 aliases 里，属于 Pressroom 上次写入的（previous）先去掉，其余视为笔记自带的（白名单中）保留在前，
+ * 结果与 transformNote 按同一 manifest 记录生成的 frontmatter 一致
+ */
+function withAliases(text: string, previous: string[], aliases: string[], ctx: PublishContext): string {
+	let data: Record<string, unknown> = {};
+	let body = text;
+	const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
+	if (m) {
+		const parsed = ctx.parseYaml(m[1]!);
+		if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) data = parsed as Record<string, unknown>;
+		body = text.slice(m[0].length);
+	}
+	const own = mergeAliases(data.aliases, []).filter((a) => !previous.includes(a));
+	data.aliases = mergeAliases(own, aliases);
+	const yaml = ctx.stringifyYaml(data);
+	return `---\n${yaml.endsWith('\n') ? yaml : `${yaml}\n`}---\n${body}`;
+}
+
+/**
+ * 一键重排（需求 §6.2，跟随 vault 站点）：已移动的笔记只挪位置，正文保持站上的旧版本（「有修改」保留）。
+ * 旧网址跳转需要在新副本 frontmatter 中写入 aliases，因此只改 frontmatter 的 aliases（2026-10-05 用户决定）。
+ * 一次提交；没有需要挪动的笔记时不提交。relative 链接策略的站点抛 RelocateUnsupportedError
+ */
+export async function relocateBatch(
+	ctx: PublishContext,
+	vaultPaths: string[],
+	message: (summary: BatchSummary) => string,
+): Promise<BatchOutcome> {
+	let outcomes: ItemOutcome[] = [];
+	let summary = emptySummary();
+	const result = await ctx.backend.commit(
+		() => message(summary),
+		async (head): Promise<Change[]> => {
+			const snap = await loadSnapshot(ctx, head);
+			if (snap.linkStrategy === 'relative') throw new RelocateUnsupportedError();
+			if (snap.manifest.mode !== 'follow') throw new Error(`「${ctx.site.name}」不是跟随 vault 站点，没有「已移动」的笔记可重排`);
+			outcomes = [];
+			summary = emptySummary();
+			const records = new Map(snap.manifest.notes.map((n) => [n.vaultPath, n]));
+			const owners = slugOwners(snap);
+			const conflicts: PublishConflictError[] = [];
+			const moves: { record: NoteRecord; target: string }[] = [];
+			for (const vaultPath of vaultPaths) {
+				const record = records.get(vaultPath);
+				if (!record || record.sitePath === vaultPath) continue;
+				const found = findConflicts(vaultPath, owners, record.sitePath);
+				for (const other of moves) {
+					if (slugOf(other.target) === slugOf(vaultPath)) found.push({ slug: slugOf(vaultPath), owner: { kind: 'file', path: other.target } });
+				}
+				if (found.length) conflicts.push(new PublishConflictError(vaultPath, found));
+				moves.push({ record, target: vaultPath });
+			}
+			if (conflicts.length === 1) throw conflicts[0]!;
+			if (conflicts.length > 1) throw new BatchConflictError(conflicts);
+
+			const changes: Change[] = [];
+			const nextRecords = new Map(records);
+			for (const { record, target } of moves) {
+				const old = snap.allFiles.find((f) => f.path === repoPath(ctx.site, record.sitePath));
+				if (!old) throw new Error(`站上找不到 ${record.sitePath}（可能已被外部删除），无法只挪位置；请使用一键同步`);
+				const aliases = aliasesAfterMove(record, target);
+				const text = withAliases(utf8Decode(await ctx.backend.readBlob(old.sha)), record.aliases, aliases, ctx);
+				changes.push({ path: repoPath(ctx.site, target), content: text });
+				changes.push({ path: repoPath(ctx.site, record.sitePath), delete: true });
+				nextRecords.set(record.vaultPath, { ...record, sitePath: target, aliases, blobSha: await gitBlobSha(text) });
+				outcomes.push({ vaultPath: record.vaultPath, kind: 'moved', sitePath: target, url: urlOf(ctx.site.siteUrl, target), from: record.sitePath });
+				summary.moved.push({ from: record.sitePath, to: target });
+			}
+			if (changes.length === 0) return [];
+			changes.push(manifestChange({ ...snap.manifest, notes: [...nextRecords.values()] }));
 			return changes;
 		},
 	);
